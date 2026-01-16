@@ -7,12 +7,11 @@ import base64
 st.set_page_config(page_title="CC TCO 精算機 (工程師版)", page_icon="🚙")
 st.title("🚙 CC 油電 vs. 汽油：TCO 分析報告")
 
-# --- 頂部狀態列 (改用不會破圖的靜態徽章) ---
-# 這是 GitHub 風格的徽章，看起來更像專業軟體
+# --- 頂部狀態列 (工程師徽章) ---
 st.markdown(
     """
     <div style="display: flex; gap: 10px;">
-        <img src="https://img.shields.io/badge/Version-2026_Pro_Edition-blue?style=flat-square" alt="Version">
+        <img src="https://img.shields.io/badge/Version-2026_Pro-blue?style=flat-square" alt="Version">
         <img src="https://img.shields.io/badge/Engineer-Verified-success?style=flat-square" alt="Verified">
         <img src="https://img.shields.io/badge/Update-Daily-orange?style=flat-square" alt="Update">
     </div>
@@ -32,8 +31,11 @@ annual_km = st.sidebar.slider("每年行駛里程 (km)", 3000, 50000, 15000)
 years_to_keep = st.sidebar.slider("預計持有幾年", 1, 10, 5)
 gas_price = st.sidebar.number_input("目前油價", value=31.0)
 
-st.sidebar.header("3. 維修參數")
+st.sidebar.header("3. 維修參數 (關鍵)")
 battery_cost = st.sidebar.number_input("大電池更換預算", value=49000)
+
+# 【新增功能】強制計入電池費用的選項
+force_battery = st.sidebar.checkbox("⚠️ 強制列入電池更換費 (最壞打算)", value=False, help="勾選此項，不管里程多少，直接把換電池的錢算進去。")
 
 # --- 核心計算引擎 ---
 def get_residual_rate(year):
@@ -54,9 +56,17 @@ tax_total = 11920 * years_to_keep
 tax_gas = tax_total
 tax_hybrid = tax_total
 
+# 電池風險邏輯 (修正版)
 battery_risk_cost = 0
-if total_km > 160000 or years_to_keep > 8:
+battery_status_msg = "✅ 安全範圍 (里程低，暫不計入)"
+
+# 邏輯：如果使用者勾選「強制」 OR 里程過高 OR 年份過久 -> 都要算錢
+if force_battery or total_km > 160000 or years_to_keep > 8:
     battery_risk_cost = battery_cost
+    if force_battery:
+        battery_status_msg = "⚠️ 已強制計入大電池費用 (最壞打算)"
+    else:
+        battery_status_msg = "⚠️ 高里程/高年份，已自動計入電池費"
 
 tco_gas = (gas_car_price - gas_resale_value) + gas_fuel_cost + tax_gas
 tco_hybrid = (hybrid_car_price - hybrid_resale_value) + hybrid_fuel_cost + tax_hybrid + battery_risk_cost
@@ -124,6 +134,9 @@ if diff > 0:
     st.success(f"🏆 油電版獲勝！省下 **${int(diff):,}**")
 else:
     st.error(f"🏆 汽油版獲勝！省下 **${int(abs(diff)):,}**")
+
+# 顯示電池狀態提醒
+st.info(f"💡 電池計算狀態：{battery_status_msg}")
 
 st.markdown("---")
 
