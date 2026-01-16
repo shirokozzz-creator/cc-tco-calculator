@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from fpdf import FPDF
 import base64
+import os # 引入作業系統工具，用來自動搜尋檔案
 
 # --- 頁面設定 ---
 st.set_page_config(page_title="CC TCO 精算機 (工程師版)", page_icon="🚙")
@@ -33,7 +34,6 @@ gas_price = st.sidebar.number_input("目前油價", value=31.0)
 
 st.sidebar.header("3. 維修參數")
 battery_cost = st.sidebar.number_input("大電池更換預算", value=49000)
-# 強制計入電池選項
 force_battery = st.sidebar.checkbox("⚠️ 強制列入電池更換費 (最壞打算)", value=False)
 
 # --- 核心計算引擎 ---
@@ -55,7 +55,6 @@ tax_total = 11920 * years_to_keep
 tax_gas = tax_total
 tax_hybrid = tax_total
 
-# 電池風險邏輯
 battery_risk_cost = 0
 battery_status_msg = "✅ 安全範圍 (里程低，暫不計入)"
 
@@ -70,17 +69,32 @@ tco_gas = (gas_car_price - gas_resale_value) + gas_fuel_cost + tax_gas
 tco_hybrid = (hybrid_car_price - hybrid_resale_value) + hybrid_fuel_cost + tax_hybrid + battery_risk_cost
 diff = tco_gas - tco_hybrid
 
-# --- PDF 產生引擎 ---
+# --- PDF 產生引擎 (自動搜尋字型版) ---
 def create_pdf():
     pdf = FPDF()
     pdf.add_page()
     
-    # 使用新上傳的純種 TTF (檔名維持 TaipeiSans.ttf)
-    try:
-        pdf.add_font('TaipeiSans', '', 'TaipeiSans.ttf', uni=True)
-        pdf.set_font('TaipeiSans', '', 16)
-    except:
-        st.error("❌ 字型載入失敗，請確認是否已上傳新的 TTF 檔案。")
+    # 🕵️‍♂️ 自動搜尋字型檔邏輯
+    # 程式會自動找目前目錄下所有的檔案，只要結尾是 .ttf 就拿來用
+    found_font = None
+    all_files = os.listdir('.')
+    for f in all_files:
+        if f.lower().endswith('.ttf'):
+            found_font = f
+            break
+            
+    if found_font:
+        # st.info(f"系統自動抓取到字型檔：{found_font}") # 測試用，顯示給您看
+        try:
+            # 不管檔案叫什麼名字，我們在 PDF 系統裡都幫它取名為 'TaipeiSans'
+            pdf.add_font('TaipeiSans', '', found_font, uni=True)
+            pdf.set_font('TaipeiSans', '', 16)
+        except Exception as e:
+            st.error(f"❌ 字型載入發生錯誤：{str(e)}")
+            return None
+    else:
+        st.error("❌ 找不到任何 .ttf 字型檔！請確認 GitHub 是否有上傳 (檔名不重要，只要是 .ttf 即可)。")
+        st.write("目前伺服器上的檔案列表：", all_files) # 顯示給您看，方便除錯
         return None
 
     pdf.cell(0, 10, 'Toyota Corolla Cross TCO 分析報告', ln=True, align='C')
