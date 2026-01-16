@@ -61,32 +61,32 @@ tco_gas = (gas_car_price - gas_resale_value) + gas_fuel_cost + tax_gas
 tco_hybrid = (hybrid_car_price - hybrid_resale_value) + hybrid_fuel_cost + tax_hybrid + battery_risk_cost
 diff = tco_gas - tco_hybrid
 
-# --- PDF 產生引擎 (fpdf2) ---
+# --- PDF 產生引擎 (加入災情版) ---
 def create_pdf():
     pdf = FPDF()
     pdf.add_page()
     
     font_path = "TaipeiSans.ttf"
     
-    # 檢查字型檔 (您的字型已經上傳成功了，這裡只是最後確認)
     if not os.path.exists(font_path):
         st.error(f"❌ 系統找不到字型檔：{font_path}")
         return None
         
     try:
-        # 載入字型
+        # 1. 載入字型
         pdf.add_font("TaipeiSans", fname=font_path)
         pdf.set_font("TaipeiSans", size=16)
         
-        # 內容生成 (使用 new_x/new_y 語法，確保相容性)
+        # 2. 標題
         pdf.cell(0, 10, "Toyota Corolla Cross TCO 分析報告", new_x="LMARGIN", new_y="NEXT", align='C')
         pdf.ln(5)
 
-        pdf.set_font("TaipeiSans", size=12)
+        # 3. 參數摘要
+        pdf.set_font("TaipeiSans", size=10)
         pdf.cell(0, 10, f"分析參數：持有 {years_to_keep} 年 / 每年 {annual_km:,} km", new_x="LMARGIN", new_y="NEXT")
-        pdf.ln(5)
-
-        # 表格
+        
+        # 4. TCO 表格
+        pdf.set_font("TaipeiSans", size=12)
         pdf.set_fill_color(240, 240, 240)
         pdf.cell(95, 10, "項目", border=1, align='C', fill=True)
         pdf.cell(47, 10, "汽油版", border=1, align='C', fill=True)
@@ -102,23 +102,46 @@ def create_pdf():
         add_row("稅金總額", tax_gas, tax_hybrid)
         add_row("大電池風險", 0, battery_risk_cost)
         
-        # 總結
         pdf.cell(95, 12, "【總持有成本 TCO】", border=1)
         pdf.cell(47, 12, f"${int(tco_gas):,}", border=1, align='R')
         pdf.cell(47, 12, f"${int(tco_hybrid):,}", border=1, new_x="LMARGIN", new_y="NEXT", align='R')
-        pdf.ln(10)
-
+        
+        # 5. 結論
+        pdf.ln(5)
         pdf.set_font("TaipeiSans", size=14)
         if diff > 0:
             pdf.cell(0, 10, f"🏆 建議購買：【油電版】 (省下 ${int(diff):,})", new_x="LMARGIN", new_y="NEXT")
         else:
             pdf.cell(0, 10, f"🏆 建議購買：【汽油版】 (省下 ${int(abs(diff)):,})", new_x="LMARGIN", new_y="NEXT")
 
+        # ==========================================
+        # 👇 新增：災情與通病檢查表 👇
+        # ==========================================
+        pdf.ln(10)
+        pdf.set_fill_color(255, 240, 240) # 淡紅色背景
+        pdf.set_font("TaipeiSans", size=14)
+        pdf.cell(0, 10, "⚠️ 重點災情與通病檢查表 (驗車必看)", fill=True, new_x="LMARGIN", new_y="NEXT")
+        
+        pdf.set_font("TaipeiSans", size=11)
+        pdf.ln(3)
+        
+        # 定義災情清單
+        issues = [
+            "1. [全車系] 車頂架漏水：檢查 A 柱/C 柱水痕、頂蓬霉味 (20-21年式最慘)。",
+            "2. [全車系] 避震器過軟：後座易暈車，像開船，建議試駕確認。",
+            "3. [全車系] 原廠車機：易當機、倒車顯影延遲、4G訊號差。",
+            "4. [油電版] 電池散熱網：位於後座旁，需定期清潔，避免電池過熱。",
+            "5. [油電版] 煞車異音：踩放煞車有滋滋聲 (總泵特性)，太大聲需注意。",
+            "6. [汽油版] CVT頓挫：低速 (20-40km) 收油再補有拉扯感，屬正常物理特性。"
+        ]
+        
+        for issue in issues:
+            pdf.cell(0, 8, issue, new_x="LMARGIN", new_y="NEXT")
+            
         pdf.ln(10)
         pdf.set_font("TaipeiSans", size=10)
         pdf.cell(0, 10, "本報告由【中油工程師 TCO 計算機】自動生成。", align='C')
         
-        # 關鍵修正：強制轉成 bytes，避免 Streamlit 報錯
         return bytes(pdf.output())
 
     except Exception as e:
@@ -169,16 +192,12 @@ with st.expander("🚨 全車系共同通病 (點擊展開)"):
     """)
 st.markdown("---")
 
-# PDF 下載區 (直接生成，不需等待)
+# PDF 下載區
 st.subheader("📥 下載您的分析報告")
-
-# 自動產生 PDF 資料
 pdf_bytes = create_pdf()
-
-# 顯示下載按鈕
 if pdf_bytes:
     st.download_button(
-        label="👉 點此下載完整報告 (PDF)",
+        label="👉 點此下載完整報告 (含災情檢查表)",
         data=pdf_bytes,
         file_name="CC_TCO_Report.pdf",
         mime="application/pdf"
