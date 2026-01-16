@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 from fpdf import FPDF
@@ -22,20 +23,44 @@ st.markdown(
 )
 
 # ==========================================
-# 🛠️ 自動修復字型功能
+# 🛠️ 終極字型修復引擎 (Auto-Fix Font v2)
 # ==========================================
 def check_and_download_font():
     font_filename = "TaipeiSans.ttf"
-    if not os.path.exists(font_filename) or os.path.getsize(font_filename) < 1000000:
-        with st.spinner('正在升級字型檔...'):
-            try:
-                url = "https://raw.githubusercontent.com/StellarCN/scp_zh/master/fonts/fireflysung.ttf"
-                response = requests.get(url)
-                with open(font_filename, "wb") as f:
-                    f.write(response.content)
-            except Exception as e:
-                st.error(f"❌ 字型下載失敗: {str(e)}")
+    
+    # 1. 檢查檔案是否已經存在
+    if os.path.exists(font_filename):
+        # 讀取檔案前 4 個 bytes，看看是不是真的字型 (字型檔通常以 0x00 或 O 開頭)
+        try:
+            with open(font_filename, 'rb') as f:
+                header = f.read(4)
+            # 如果開頭是 "<" (代表是 HTML 網頁)，那就是壞檔！
+            if header.startswith(b'<') or header.startswith(b'<!DO'):
+                st.warning("⚠️ 偵測到損毀的字型檔 (是網頁不是字型)，正在自動刪除重抓...")
+                os.remove(font_filename)
+        except:
+            os.remove(font_filename)
 
+    # 2. 如果檔案不在了 (被刪了或是本來就沒有)，開始下載
+    if not os.path.exists(font_filename):
+        with st.spinner('正在從 Google 下載正版字型 (Noto Sans TC)...'):
+            try:
+                # 使用 Google Fonts 的官方原始檔，最穩定
+                url = "https://raw.githubusercontent.com/google/fonts/main/ofl/notosanstc/NotoSansTC-Regular.ttf"
+                # 偽裝成瀏覽器，避免被擋
+                headers = {'User-Agent': 'Mozilla/5.0'}
+                response = requests.get(url, headers=headers)
+                
+                if response.status_code == 200:
+                    with open(font_filename, "wb") as f:
+                        f.write(response.content)
+                    st.success("✅ 字型檔修復完成！")
+                else:
+                    st.error(f"❌ 下載失敗，伺服器回應代碼：{response.status_code}")
+            except Exception as e:
+                st.error(f"❌ 字型下載發生錯誤: {str(e)}")
+
+# 執行修復
 check_and_download_font()
 # ==========================================
 
@@ -80,27 +105,24 @@ tco_gas = (gas_car_price - gas_resale_value) + gas_fuel_cost + tax_gas
 tco_hybrid = (hybrid_car_price - hybrid_resale_value) + hybrid_fuel_cost + tax_hybrid + battery_risk_cost
 diff = tco_gas - tco_hybrid
 
-# --- PDF 產生引擎 (fpdf2 新版寫法) ---
+# --- PDF 產生引擎 (fpdf2) ---
 def create_pdf():
     pdf = FPDF()
     pdf.add_page()
     
-    # 1. 載入字型 (注意：fpdf2 不需要 uni=True)
+    # 載入字型
     try:
-        found_font = "TaipeiSans.ttf"
-        for f in os.listdir('.'):
-            if f.lower().endswith('.ttf'):
-                found_font = f
-                break
-        
-        # fpdf2 的寫法：直接指定 fname
-        pdf.add_font("TaipeiSans", fname=found_font)
+        # 直接指定我們剛剛下載好的 Noto Sans
+        pdf.add_font("TaipeiSans", fname="TaipeiSans.ttf")
         pdf.set_font("TaipeiSans", size=16)
     except Exception as e:
-        st.error(f"❌ 字型載入錯誤: {str(e)}")
+        st.error(f"❌ PDF 引擎錯誤: {str(e)}")
+        # 如果失敗，嘗試刪除壞檔讓使用者再按一次
+        if os.path.exists("TaipeiSans.ttf"):
+            os.remove("TaipeiSans.ttf")
         return None
 
-    # 2. 內容生成
+    # 內容生成
     pdf.cell(0, 10, "Toyota Corolla Cross TCO 分析報告", new_x="LMARGIN", new_y="NEXT", align='C')
     pdf.ln(5)
 
@@ -140,7 +162,7 @@ def create_pdf():
     pdf.set_font("TaipeiSans", size=10)
     pdf.cell(0, 10, "本報告由【中油工程師 TCO 計算機】自動生成。", align='C')
     
-    return pdf.output() # fpdf2 直接輸出 bytes
+    return pdf.output()
 
 # --- 顯示網頁 ---
 col1, col2 = st.columns(2)
@@ -157,7 +179,7 @@ else:
 st.info(f"💡 電池狀態：{battery_status_msg}")
 st.markdown("---")
 
-# 圖表與資訊
+# 圖表
 cost_data = pd.DataFrame({
     "項目": ["折舊", "油錢", "稅金", "大電池"],
     "汽油版": [gas_car_price - gas_resale_value, gas_fuel_cost, tax_gas, 0],
