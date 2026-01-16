@@ -3,36 +3,40 @@ import streamlit as st
 import pandas as pd
 from fpdf import FPDF
 import os
+import time
 
 # --- 頁面設定 ---
-st.set_page_config(page_title="CC TCO 精算機 (工程師版)", page_icon="🚙")
-st.title("🚙 CC 油電 vs. 汽油：TCO 分析報告")
+st.set_page_config(page_title="航太級 TCO 精算機", page_icon="✈️")
+st.title("✈️ 航太工程師的 CC 購車精算機")
 
-# --- 頂部狀態列 ---
+# --- 頂部狀態列 (改為航太風格) ---
 st.markdown(
     """
     <div style="display: flex; gap: 10px;">
-        <img src="https://img.shields.io/badge/Version-2026_Pro-blue?style=flat-square" alt="Version">
-        <img src="https://img.shields.io/badge/Engineer-Verified-success?style=flat-square" alt="Verified">
+        <img src="https://img.shields.io/badge/Standard-Aerospace_Grade-0052CC?style=flat-square" alt="Standard">
+        <img src="https://img.shields.io/badge/System-Safety_Check-success?style=flat-square" alt="Safety">
     </div>
     <br>
     """,
     unsafe_allow_html=True
 )
 
+st.caption("用「飛機維修」的高標準，重新審視汽車的持有成本與妥善率。")
+
 # --- 側邊欄輸入 ---
 st.sidebar.header("1. 設定您的入手價格")
+st.sidebar.info("💡 請輸入最終成交價")
 gas_car_price = st.sidebar.number_input("⛽ 汽油版 - 入手價", value=760000, step=10000)
 hybrid_car_price = st.sidebar.number_input("⚡ 油電版 - 入手價", value=880000, step=10000)
 
-st.sidebar.header("2. 用車習慣")
+st.sidebar.header("2. 用車習慣 (飛行計畫)")
 annual_km = st.sidebar.slider("每年行駛里程 (km)", 3000, 50000, 15000) 
 years_to_keep = st.sidebar.slider("預計持有幾年", 1, 10, 5)
 gas_price = st.sidebar.number_input("目前油價", value=31.0)
 
-st.sidebar.header("3. 維修參數")
+st.sidebar.header("3. 維修參數 (飛安係數)")
 battery_cost = st.sidebar.number_input("大電池更換預算", value=49000)
-force_battery = st.sidebar.checkbox("⚠️ 強制列入電池更換費", value=False)
+force_battery = st.sidebar.checkbox("⚠️ 強制列入電池更換費 (風險控管)", value=False)
 
 # --- 計算邏輯 ---
 def get_residual_rate(year):
@@ -52,43 +56,41 @@ tax_gas = tax_total
 tax_hybrid = tax_total
 
 battery_risk_cost = 0
-battery_status_msg = "✅ 安全範圍"
+battery_status_msg = "✅ 系統檢測正常 (里程低，暫不計入)"
 if force_battery or total_km > 160000 or years_to_keep > 8:
     battery_risk_cost = battery_cost
-    battery_status_msg = "⚠️ 已計入大電池費用"
+    battery_status_msg = "⚠️ 系統風險預警：已計入大電池更換成本"
 
 tco_gas = (gas_car_price - gas_resale_value) + gas_fuel_cost + tax_gas
 tco_hybrid = (hybrid_car_price - hybrid_resale_value) + hybrid_fuel_cost + tax_hybrid + battery_risk_cost
 diff = tco_gas - tco_hybrid
 
-# --- PDF 產生引擎 (加入災情版) ---
+# --- PDF 產生引擎 ---
 def create_pdf():
     pdf = FPDF()
     pdf.add_page()
     
     font_path = "TaipeiSans.ttf"
-    
     if not os.path.exists(font_path):
         st.error(f"❌ 系統找不到字型檔：{font_path}")
         return None
         
     try:
-        # 1. 載入字型
         pdf.add_font("TaipeiSans", fname=font_path)
         pdf.set_font("TaipeiSans", size=16)
         
-        # 2. 標題
-        pdf.cell(0, 10, "Toyota Corolla Cross TCO 分析報告", new_x="LMARGIN", new_y="NEXT", align='C')
+        # 標題
+        pdf.cell(0, 10, "Toyota Corolla Cross TCO 分析報告 (航太級)", new_x="LMARGIN", new_y="NEXT", align='C')
         pdf.ln(5)
 
-        # 3. 參數摘要
+        # 參數
         pdf.set_font("TaipeiSans", size=10)
-        pdf.cell(0, 10, f"分析參數：持有 {years_to_keep} 年 / 每年 {annual_km:,} km", new_x="LMARGIN", new_y="NEXT")
+        pdf.cell(0, 10, f"飛行任務參數：持有 {years_to_keep} 年 / 每年 {annual_km:,} km", new_x="LMARGIN", new_y="NEXT")
         
-        # 4. TCO 表格
+        # 表格
         pdf.set_font("TaipeiSans", size=12)
         pdf.set_fill_color(240, 240, 240)
-        pdf.cell(95, 10, "項目", border=1, align='C', fill=True)
+        pdf.cell(95, 10, "監測項目", border=1, align='C', fill=True)
         pdf.cell(47, 10, "汽油版", border=1, align='C', fill=True)
         pdf.cell(47, 10, "油電版", border=1, new_x="LMARGIN", new_y="NEXT", align='C', fill=True)
 
@@ -106,41 +108,36 @@ def create_pdf():
         pdf.cell(47, 12, f"${int(tco_gas):,}", border=1, align='R')
         pdf.cell(47, 12, f"${int(tco_hybrid):,}", border=1, new_x="LMARGIN", new_y="NEXT", align='R')
         
-        # 5. 結論
+        # 結論
         pdf.ln(5)
         pdf.set_font("TaipeiSans", size=14)
         if diff > 0:
-            pdf.cell(0, 10, f"🏆 建議購買：【油電版】 (省下 ${int(diff):,})", new_x="LMARGIN", new_y="NEXT")
+            pdf.cell(0, 10, f"🏆 推薦型號：【油電版】 (預計節省 ${int(diff):,})", new_x="LMARGIN", new_y="NEXT")
         else:
-            pdf.cell(0, 10, f"🏆 建議購買：【汽油版】 (省下 ${int(abs(diff)):,})", new_x="LMARGIN", new_y="NEXT")
+            pdf.cell(0, 10, f"🏆 推薦型號：【汽油版】 (預計節省 ${int(abs(diff)):,})", new_x="LMARGIN", new_y="NEXT")
 
-        # ==========================================
-        # 👇 新增：災情與通病檢查表 👇
-        # ==========================================
+        # 災情表
         pdf.ln(10)
-        pdf.set_fill_color(255, 240, 240) # 淡紅色背景
+        pdf.set_fill_color(255, 240, 240)
         pdf.set_font("TaipeiSans", size=14)
-        pdf.cell(0, 10, "⚠️ 重點災情與通病檢查表 (驗車必看)", fill=True, new_x="LMARGIN", new_y="NEXT")
+        pdf.cell(0, 10, "⚠️ 機體結構與系統弱點檢查表 (驗車必看)", fill=True, new_x="LMARGIN", new_y="NEXT")
         
         pdf.set_font("TaipeiSans", size=11)
         pdf.ln(3)
-        
-        # 定義災情清單
         issues = [
-            "1. [全車系] 車頂架漏水：檢查 A 柱/C 柱水痕、頂蓬霉味 (20-21年式最慘)。",
-            "2. [全車系] 避震器過軟：後座易暈車，像開船，建議試駕確認。",
-            "3. [全車系] 原廠車機：易當機、倒車顯影延遲、4G訊號差。",
-            "4. [油電版] 電池散熱網：位於後座旁，需定期清潔，避免電池過熱。",
-            "5. [油電版] 煞車異音：踩放煞車有滋滋聲 (總泵特性)，太大聲需注意。",
-            "6. [汽油版] CVT頓挫：低速 (20-40km) 收油再補有拉扯感，屬正常物理特性。"
+            "1. [機體結構] 車頂架漏水：A柱/C柱水痕、頂蓬霉味 (2020-2021年式好發)。",
+            "2. [懸吊系統] 避震器過軟：後座乘客易產生暈眩，建議試駕確認。",
+            "3. [航電系統] 原廠車機：易發生死機、訊號延遲。",
+            "4. [動力系統] 油電版電池濾網：位於後座側邊，堵塞將導致散熱失效。",
+            "5. [制動系統] 煞車總泵異音：踩放時有滋滋電流聲(正常特性)，過大需注意。",
+            "6. [傳動系統] CVT頓挫：低速收油再補油有拉扯感，屬物理特性。"
         ]
-        
         for issue in issues:
             pdf.cell(0, 8, issue, new_x="LMARGIN", new_y="NEXT")
             
         pdf.ln(10)
         pdf.set_font("TaipeiSans", size=10)
-        pdf.cell(0, 10, "本報告由【中油工程師 TCO 計算機】自動生成。", align='C')
+        pdf.cell(0, 10, "本報告由【航太工程師 TCO 計算機】自動生成。", align='C')
         
         return bytes(pdf.output())
 
@@ -156,14 +153,15 @@ with col2:
     st.metric("油電版總花費", f"${int(tco_hybrid):,}", delta=f"差額 ${int(diff):,}")
 
 if diff > 0:
-    st.success(f"🏆 油電版獲勝！省下 **${int(diff):,}**")
+    st.success(f"🏆 數據顯示：【油電版】更具經濟效益！省下 **${int(diff):,}**")
 else:
-    st.error(f"🏆 汽油版獲勝！省下 **${int(abs(diff)):,}**")
+    st.error(f"🏆 數據顯示：【汽油版】更具經濟效益！省下 **${int(abs(diff)):,}**")
 
-st.info(f"💡 電池狀態：{battery_status_msg}")
+st.info(f"💡 電池模組狀態：{battery_status_msg}")
 st.markdown("---")
 
 # 圖表
+st.subheader("📊 全生命週期成本分析 (LCC Analysis)")
 cost_data = pd.DataFrame({
     "項目": ["折舊", "油錢", "稅金", "大電池"],
     "汽油版": [gas_car_price - gas_resale_value, gas_fuel_cost, tax_gas, 0],
@@ -171,7 +169,7 @@ cost_data = pd.DataFrame({
 })
 st.bar_chart(cost_data.set_index("項目"))
 
-st.subheader("📉 未來 10 年殘值預測")
+st.subheader("📉 資產殘值預測曲線")
 years_range = list(range(1, 11))
 rates = [get_residual_rate(y) for y in years_range]
 resale_df = pd.DataFrame({
@@ -183,27 +181,48 @@ resale_df = pd.DataFrame({
 st.dataframe(resale_df, use_container_width=True)
 
 st.markdown("---")
-st.subheader("🔍 工程師的災情資料庫")
-with st.expander("🚨 全車系共同通病 (點擊展開)"):
+st.subheader("🔍 航太工程師的災情資料庫")
+st.caption("就像飛機起飛前的 Pre-flight Check，買車前務必確認這些項目。")
+
+with st.expander("🚨 機體與系統通病列表 (點擊展開)"):
     st.markdown("""
-    - **💦 車頂架漏水**：20-21年式最慘，買二手必驗頂蓬水痕。
-    - **🤢 避震器過軟**：後座易暈車，建議試駕或預留改裝費。
-    - **🖥️ 車機災情**：原廠車機易當機/訊號差。
+    - **💦 機體結構 (漏水)**：20-21年式車頂架防水墊片瑕疵，**風險等級：高**。
+    - **🤢 懸吊系統 (軟腳)**：原廠設定舒適取向，導致動態不穩，**建議方案：更換改裝避震**。
+    - **🖥️ 航電系統 (車機)**：原廠 Drive+ Connect 穩定度不足，**建議方案：改裝安卓機**。
     """)
 st.markdown("---")
 
 # PDF 下載區
-st.subheader("📥 下載您的分析報告")
+st.subheader("📥 下載完整分析報告")
 pdf_bytes = create_pdf()
 if pdf_bytes:
     st.download_button(
-        label="👉 點此下載完整報告 (含災情檢查表)",
+        label="👉 下載 PDF 報告 (含災情檢查表)",
         data=pdf_bytes,
-        file_name="CC_TCO_Report.pdf",
+        file_name="CC_Aero_Report.pdf",
         mime="application/pdf"
     )
-else:
-    st.warning("⚠️ 報告生成中，請確認字型檔是否正確上傳...")
 
 st.markdown("---")
-st.markdown("#### 👉 [下載：CC 驗車懶人包 (PDF) - $199](#)")
+
+# ==========================================
+# 🚀 假門測試 (Smoke Test) 區域
+# ==========================================
+st.markdown("#### 👨‍🔧 想像檢查飛機一樣檢查二手車？")
+st.markdown("我正在將航太維修的 SOP 轉化為二手車驗車手冊。")
+
+# 使用 st.form 來模擬一個收集 Email 的區塊，或者單純用按鈕測試
+col_a, col_b = st.columns([3, 1])
+
+with col_a:
+    st.markdown("👉 **《航太級 CC 驗車圖文懶人包》 (早鳥優惠 $199)**")
+
+with col_b:
+    # 這裡就是「假門」：使用者以為可以買，但點下去只會看到通知
+    if st.button("🔥 搶先獲取"):
+        st.toast("🙏 感謝您的興趣！", icon="✈️")
+        time.sleep(1)
+        st.toast("本手冊目前正在進行最終校對 (Final Check)。", icon="👨‍🔧")
+        time.sleep(1)
+        st.toast("預計下週上線，請密切關注！", icon="📅")
+        # 您可以在後台 (Analytics) 看到有多少人點了這個按鈕
