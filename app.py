@@ -1,8 +1,9 @@
+
 import streamlit as st
 import pandas as pd
 from fpdf import FPDF
-import base64
-import os # 引入作業系統工具，用來自動搜尋檔案
+import os
+import requests  # 用來自動下載字型
 
 # --- 頁面設定 ---
 st.set_page_config(page_title="CC TCO 精算機 (工程師版)", page_icon="🚙")
@@ -20,6 +21,29 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
+# ==========================================
+# 🛠️ 自動修復字型功能 (Auto-Fix Font)
+# ==========================================
+def check_and_download_font():
+    font_filename = "TaipeiSans.ttf"
+    
+    # 如果檔案不存在，或者檔案太小 (小於 1MB 代表可能是壞檔)，就重新下載
+    if not os.path.exists(font_filename) or os.path.getsize(font_filename) < 1000000:
+        with st.spinner('正在自動下載中文字型檔 (第一次會比較久)...'):
+            try:
+                # 使用穩定的開源字型 (Firefly Sung) 下載連結
+                url = "https://raw.githubusercontent.com/StellarCN/scp_zh/master/fonts/fireflysung.ttf"
+                response = requests.get(url)
+                with open(font_filename, "wb") as f:
+                    f.write(response.content)
+                st.success("✅ 字型檔自動修復完成！")
+            except Exception as e:
+                st.error(f"❌ 字型下載失敗: {e}")
+
+# 在程式一開始就執行檢查
+check_and_download_font()
+# ==========================================
 
 # --- 側邊欄輸入 ---
 st.sidebar.header("1. 設定您的入手價格")
@@ -69,32 +93,17 @@ tco_gas = (gas_car_price - gas_resale_value) + gas_fuel_cost + tax_gas
 tco_hybrid = (hybrid_car_price - hybrid_resale_value) + hybrid_fuel_cost + tax_hybrid + battery_risk_cost
 diff = tco_gas - tco_hybrid
 
-# --- PDF 產生引擎 (自動搜尋字型版) ---
+# --- PDF 產生引擎 ---
 def create_pdf():
     pdf = FPDF()
     pdf.add_page()
     
-    # 🕵️‍♂️ 自動搜尋字型檔邏輯
-    # 程式會自動找目前目錄下所有的檔案，只要結尾是 .ttf 就拿來用
-    found_font = None
-    all_files = os.listdir('.')
-    for f in all_files:
-        if f.lower().endswith('.ttf'):
-            found_font = f
-            break
-            
-    if found_font:
-        # st.info(f"系統自動抓取到字型檔：{found_font}") # 測試用，顯示給您看
-        try:
-            # 不管檔案叫什麼名字，我們在 PDF 系統裡都幫它取名為 'TaipeiSans'
-            pdf.add_font('TaipeiSans', '', found_font, uni=True)
-            pdf.set_font('TaipeiSans', '', 16)
-        except Exception as e:
-            st.error(f"❌ 字型載入發生錯誤：{str(e)}")
-            return None
-    else:
-        st.error("❌ 找不到任何 .ttf 字型檔！請確認 GitHub 是否有上傳 (檔名不重要，只要是 .ttf 即可)。")
-        st.write("目前伺服器上的檔案列表：", all_files) # 顯示給您看，方便除錯
+    try:
+        # 因為前面已經自動下載了，這裡直接讀取
+        pdf.add_font('TaipeiSans', '', 'TaipeiSans.ttf', uni=True)
+        pdf.set_font('TaipeiSans', '', 16)
+    except Exception as e:
+        st.error(f"❌ PDF 引擎錯誤: {str(e)}")
         return None
 
     pdf.cell(0, 10, 'Toyota Corolla Cross TCO 分析報告', ln=True, align='C')
