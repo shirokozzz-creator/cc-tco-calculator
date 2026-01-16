@@ -7,7 +7,7 @@ import base64
 st.set_page_config(page_title="CC TCO 精算機 (災情資料庫版)", page_icon="🚙")
 st.title("🚙 CC 油電 vs. 汽油：TCO 分析報告")
 
-# --- 流量計數器 (選配) ---
+# --- 流量計數器 ---
 st.markdown(
     """
     <div style="display: flex; justify-content: center;">
@@ -44,14 +44,18 @@ hybrid_resale_value = hybrid_car_price * current_rate
 total_km = annual_km * years_to_keep
 gas_fuel_cost = (total_km / 12.0) * gas_price
 hybrid_fuel_cost = (total_km / 21.0) * gas_price
+
+# 修正點：這裡統一使用 tax_total，並為了圖表方便，定義這兩個變數
 tax_total = 11920 * years_to_keep
+tax_gas = tax_total      # 修正錯誤：明確定義 tax_gas
+tax_hybrid = tax_total   # 修正錯誤：明確定義 tax_hybrid
 
 battery_risk_cost = 0
 if total_km > 160000 or years_to_keep > 8:
     battery_risk_cost = battery_cost
 
-tco_gas = (gas_car_price - gas_resale_value) + gas_fuel_cost + tax_total
-tco_hybrid = (hybrid_car_price - hybrid_resale_value) + hybrid_fuel_cost + tax_total + battery_risk_cost
+tco_gas = (gas_car_price - gas_resale_value) + gas_fuel_cost + tax_gas
+tco_hybrid = (hybrid_car_price - hybrid_resale_value) + hybrid_fuel_cost + tax_hybrid + battery_risk_cost
 diff = tco_gas - tco_hybrid
 
 # --- PDF 產生引擎 ---
@@ -59,7 +63,6 @@ def create_pdf():
     pdf = FPDF()
     pdf.add_page()
     
-    # 嘗試載入字型，失敗則跳過
     try:
         pdf.add_font('TaipeiSans', '', 'TaipeiSans.ttf', uni=True)
         pdf.set_font('TaipeiSans', '', 16)
@@ -86,7 +89,7 @@ def create_pdf():
 
     add_row("車價折舊損失 (買-賣)", gas_car_price - gas_resale_value, hybrid_car_price - hybrid_resale_value)
     add_row("總油錢支出", gas_fuel_cost, hybrid_fuel_cost)
-    add_row("稅金總額", tax_total, tax_total)
+    add_row("稅金總額", tax_gas, tax_hybrid) # 使用修正後的變數
     add_row("大電池風險", 0, battery_risk_cost)
     
     pdf.cell(95, 12, "【總持有成本 TCO】", 1)
@@ -124,8 +127,8 @@ st.markdown("---")
 st.subheader("💰 成本結構拆解")
 cost_data = pd.DataFrame({
     "項目": ["折舊損失", "油錢", "稅金", "大電池"],
-    "汽油版": [gas_car_price - gas_resale_value, gas_fuel_cost, tax_gas, 0],
-    "油電版": [hybrid_car_price - hybrid_resale_value, hybrid_fuel_cost, tax_hybrid, battery_risk_cost]
+    "汽油版": [gas_car_price - gas_resale_value, gas_fuel_cost, tax_gas, 0], # 修正點：這裡現在讀得到了
+    "油電版": [hybrid_car_price - hybrid_resale_value, hybrid_fuel_cost, tax_hybrid, battery_risk_cost] # 修正點
 })
 st.bar_chart(cost_data.set_index("項目"))
 
@@ -143,9 +146,7 @@ st.dataframe(resale_df, use_container_width=True)
 
 st.markdown("---")
 
-# ==========================================
-# 👇 這裡是我們新加入的「災情資料庫」區塊 👇
-# ==========================================
+# --- 災情資料庫區塊 ---
 st.subheader("🔍 工程師的災情資料庫 (驗車必看)")
 st.caption("買車前先看缺點，才知道能不能接受。")
 
@@ -155,7 +156,7 @@ with st.expander("🚨 全車系共同通病 (漏水/避震/車機) - 點擊展�
         - **症狀：** 檢查 A 柱、C 柱飾板是否有水痕，頂蓬是否有霉味。
         - **解法：** 原廠有召回更換防水墊片，買二手需確認是否已處理。
     - **🤢 避震器過軟 (暈車屬性)**
-        - **症狀：** 原廠懸吊行程長且軟，後座乘客容易暈車，高速變換車道像「開船」。
+        - **症狀：** 原廠懸吊行程長且軟，後座乘客容易暈車。
         - **建議：** 試駕時請家人坐後座感受，很多人買回後需花 2-3 萬改裝避震。
     - **🖥️ 原廠車機 (Drive+ Connect) 災情**
         - **症狀：** 4G 訊號連不上、導航當機、倒車顯影延遲。
@@ -183,10 +184,6 @@ with tab2:
     - **📉 市區油耗落差**
         - **注意：** 純市區行駛油耗可能只有 9-10 km/L，要有心理準備。
     """)
-
-# ==========================================
-# 👆 災情區塊結束 👆
-# ==========================================
 
 st.markdown("---")
 
