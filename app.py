@@ -1,9 +1,7 @@
-
 import streamlit as st
 import pandas as pd
 from fpdf import FPDF
 import os
-import requests
 
 # --- 頁面設定 ---
 st.set_page_config(page_title="CC TCO 精算機 (工程師版)", page_icon="🚙")
@@ -15,54 +13,11 @@ st.markdown(
     <div style="display: flex; gap: 10px;">
         <img src="https://img.shields.io/badge/Version-2026_Pro-blue?style=flat-square" alt="Version">
         <img src="https://img.shields.io/badge/Engineer-Verified-success?style=flat-square" alt="Verified">
-        <img src="https://img.shields.io/badge/Update-Daily-orange?style=flat-square" alt="Update">
     </div>
     <br>
     """,
     unsafe_allow_html=True
 )
-
-# ==========================================
-# 🛠️ 終極字型修復引擎 (Auto-Fix Font v2)
-# ==========================================
-def check_and_download_font():
-    font_filename = "TaipeiSans.ttf"
-    
-    # 1. 檢查檔案是否已經存在
-    if os.path.exists(font_filename):
-        # 讀取檔案前 4 個 bytes，看看是不是真的字型 (字型檔通常以 0x00 或 O 開頭)
-        try:
-            with open(font_filename, 'rb') as f:
-                header = f.read(4)
-            # 如果開頭是 "<" (代表是 HTML 網頁)，那就是壞檔！
-            if header.startswith(b'<') or header.startswith(b'<!DO'):
-                st.warning("⚠️ 偵測到損毀的字型檔 (是網頁不是字型)，正在自動刪除重抓...")
-                os.remove(font_filename)
-        except:
-            os.remove(font_filename)
-
-    # 2. 如果檔案不在了 (被刪了或是本來就沒有)，開始下載
-    if not os.path.exists(font_filename):
-        with st.spinner('正在從 Google 下載正版字型 (Noto Sans TC)...'):
-            try:
-                # 使用 Google Fonts 的官方原始檔，最穩定
-                url = "https://raw.githubusercontent.com/google/fonts/main/ofl/notosanstc/NotoSansTC-Regular.ttf"
-                # 偽裝成瀏覽器，避免被擋
-                headers = {'User-Agent': 'Mozilla/5.0'}
-                response = requests.get(url, headers=headers)
-                
-                if response.status_code == 200:
-                    with open(font_filename, "wb") as f:
-                        f.write(response.content)
-                    st.success("✅ 字型檔修復完成！")
-                else:
-                    st.error(f"❌ 下載失敗，伺服器回應代碼：{response.status_code}")
-            except Exception as e:
-                st.error(f"❌ 字型下載發生錯誤: {str(e)}")
-
-# 執行修復
-check_and_download_font()
-# ==========================================
 
 # --- 側邊欄輸入 ---
 st.sidebar.header("1. 設定您的入手價格")
@@ -76,7 +31,7 @@ gas_price = st.sidebar.number_input("目前油價", value=31.0)
 
 st.sidebar.header("3. 維修參數")
 battery_cost = st.sidebar.number_input("大電池更換預算", value=49000)
-force_battery = st.sidebar.checkbox("⚠️ 強制列入電池更換費 (最壞打算)", value=False)
+force_battery = st.sidebar.checkbox("⚠️ 強制列入電池更換費", value=False)
 
 # --- 計算邏輯 ---
 def get_residual_rate(year):
@@ -105,64 +60,70 @@ tco_gas = (gas_car_price - gas_resale_value) + gas_fuel_cost + tax_gas
 tco_hybrid = (hybrid_car_price - hybrid_resale_value) + hybrid_fuel_cost + tax_hybrid + battery_risk_cost
 diff = tco_gas - tco_hybrid
 
-# --- PDF 產生引擎 (fpdf2) ---
+# --- PDF 產生引擎 (Clean Version) ---
 def create_pdf():
     pdf = FPDF()
     pdf.add_page()
     
-    # 載入字型
-    try:
-        # 直接指定我們剛剛下載好的 Noto Sans
-        pdf.add_font("TaipeiSans", fname="TaipeiSans.ttf")
-        pdf.set_font("TaipeiSans", size=16)
-    except Exception as e:
-        st.error(f"❌ PDF 引擎錯誤: {str(e)}")
-        # 如果失敗，嘗試刪除壞檔讓使用者再按一次
-        if os.path.exists("TaipeiSans.ttf"):
-            os.remove("TaipeiSans.ttf")
+    # 這是最關鍵的一步：直接讀取您上傳的檔案
+    font_path = "TaipeiSans.ttf"
+    
+    # 檢查檔案是否存在
+    if not os.path.exists(font_path):
+        st.error(f"❌ 找不到字型檔：{font_path}")
+        st.info("請確認您已在 GitHub 上傳了改名為 TaipeiSans.ttf 的字型檔。")
         return None
+        
+    try:
+        # 載入字型
+        pdf.add_font("TaipeiSans", fname=font_path)
+        pdf.set_font("TaipeiSans", size=16)
+        
+        # 內容生成
+        pdf.cell(0, 10, "Toyota Corolla Cross TCO 分析報告", new_x="LMARGIN", new_y="NEXT", align='C')
+        pdf.ln(5)
 
-    # 內容生成
-    pdf.cell(0, 10, "Toyota Corolla Cross TCO 分析報告", new_x="LMARGIN", new_y="NEXT", align='C')
-    pdf.ln(5)
+        pdf.set_font("TaipeiSans", size=12)
+        pdf.cell(0, 10, f"分析參數：持有 {years_to_keep} 年 / 每年 {annual_km:,} km", new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(5)
 
-    pdf.set_font("TaipeiSans", size=12)
-    pdf.cell(0, 10, f"分析參數：持有 {years_to_keep} 年 / 每年 {annual_km:,} km", new_x="LMARGIN", new_y="NEXT")
-    pdf.ln(5)
+        # 表格
+        pdf.set_fill_color(240, 240, 240)
+        pdf.cell(95, 10, "項目", border=1, align='C', fill=True)
+        pdf.cell(47, 10, "汽油版", border=1, align='C', fill=True)
+        pdf.cell(47, 10, "油電版", border=1, new_x="LMARGIN", new_y="NEXT", align='C', fill=True)
 
-    # 表格
-    pdf.set_fill_color(240, 240, 240)
-    pdf.cell(95, 10, "項目", border=1, align='C', fill=True)
-    pdf.cell(47, 10, "汽油版", border=1, align='C', fill=True)
-    pdf.cell(47, 10, "油電版", border=1, new_x="LMARGIN", new_y="NEXT", align='C', fill=True)
+        def add_row(name, val1, val2):
+            pdf.cell(95, 10, str(name), border=1)
+            pdf.cell(47, 10, f"${int(val1):,}", border=1, align='R')
+            pdf.cell(47, 10, f"${int(val2):,}", border=1, new_x="LMARGIN", new_y="NEXT", align='R')
 
-    def add_row(name, val1, val2):
-        pdf.cell(95, 10, str(name), border=1)
-        pdf.cell(47, 10, f"${int(val1):,}", border=1, align='R')
-        pdf.cell(47, 10, f"${int(val2):,}", border=1, new_x="LMARGIN", new_y="NEXT", align='R')
+        add_row("車價折舊損失", gas_car_price - gas_resale_value, hybrid_car_price - hybrid_resale_value)
+        add_row("總油錢支出", gas_fuel_cost, hybrid_fuel_cost)
+        add_row("稅金總額", tax_gas, tax_hybrid)
+        add_row("大電池風險", 0, battery_risk_cost)
+        
+        # 總結
+        pdf.cell(95, 12, "【總持有成本 TCO】", border=1)
+        pdf.cell(47, 12, f"${int(tco_gas):,}", border=1, align='R')
+        pdf.cell(47, 12, f"${int(tco_hybrid):,}", border=1, new_x="LMARGIN", new_y="NEXT", align='R')
+        pdf.ln(10)
 
-    add_row("車價折舊損失", gas_car_price - gas_resale_value, hybrid_car_price - hybrid_resale_value)
-    add_row("總油錢支出", gas_fuel_cost, hybrid_fuel_cost)
-    add_row("稅金總額", tax_gas, tax_hybrid)
-    add_row("大電池風險", 0, battery_risk_cost)
-    
-    # 總結
-    pdf.cell(95, 12, "【總持有成本 TCO】", border=1)
-    pdf.cell(47, 12, f"${int(tco_gas):,}", border=1, align='R')
-    pdf.cell(47, 12, f"${int(tco_hybrid):,}", border=1, new_x="LMARGIN", new_y="NEXT", align='R')
-    pdf.ln(10)
+        pdf.set_font("TaipeiSans", size=14)
+        if diff > 0:
+            pdf.cell(0, 10, f"🏆 建議購買：【油電版】 (省下 ${int(diff):,})", new_x="LMARGIN", new_y="NEXT")
+        else:
+            pdf.cell(0, 10, f"🏆 建議購買：【汽油版】 (省下 ${int(abs(diff)):,})", new_x="LMARGIN", new_y="NEXT")
 
-    pdf.set_font("TaipeiSans", size=14)
-    if diff > 0:
-        pdf.cell(0, 10, f"🏆 建議購買：【油電版】 (省下 ${int(diff):,})", new_x="LMARGIN", new_y="NEXT")
-    else:
-        pdf.cell(0, 10, f"🏆 建議購買：【汽油版】 (省下 ${int(abs(diff)):,})", new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(10)
+        pdf.set_font("TaipeiSans", size=10)
+        pdf.cell(0, 10, "本報告由【中油工程師 TCO 計算機】自動生成。", align='C')
+        
+        return pdf.output()
 
-    pdf.ln(10)
-    pdf.set_font("TaipeiSans", size=10)
-    pdf.cell(0, 10, "本報告由【中油工程師 TCO 計算機】自動生成。", align='C')
-    
-    return pdf.output()
+    except Exception as e:
+        st.error(f"❌ PDF 生成失敗: {str(e)}")
+        return None
 
 # --- 顯示網頁 ---
 col1, col2 = st.columns(2)
