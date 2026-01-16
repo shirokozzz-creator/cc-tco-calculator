@@ -4,17 +4,19 @@ from fpdf import FPDF
 import base64
 
 # --- 頁面設定 ---
-st.set_page_config(page_title="CC TCO 精算機 (災情資料庫版)", page_icon="🚙")
+st.set_page_config(page_title="CC TCO 精算機 (工程師版)", page_icon="🚙")
 st.title("🚙 CC 油電 vs. 汽油：TCO 分析報告")
 
-# --- 流量計數器 (更換為穩定版) ---
-# 使用 hits.seeyoufarm.com，這是 GitHub 開發者最常用的，不會被輕易擋掉
-# 我已經把您的網址填入 url 參數中
+# --- 頂部狀態列 (改用不會破圖的靜態徽章) ---
+# 這是 GitHub 風格的徽章，看起來更像專業軟體
 st.markdown(
     """
-    <div style="display: flex; justify-content: center;">
-        <img src="https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fcc-tco-calculator-nyscfmvgcj3mfh68rtqpgh.streamlit.app&count_bg=%2322C55E&title_bg=%23555555&icon=&icon_color=%23E7E7E7&title=👀+累積訪客&edge_flat=true" alt="Visit Counter">
+    <div style="display: flex; gap: 10px;">
+        <img src="https://img.shields.io/badge/Version-2026_Pro_Edition-blue?style=flat-square" alt="Version">
+        <img src="https://img.shields.io/badge/Engineer-Verified-success?style=flat-square" alt="Verified">
+        <img src="https://img.shields.io/badge/Update-Daily-orange?style=flat-square" alt="Update">
     </div>
+    <br>
     """,
     unsafe_allow_html=True
 )
