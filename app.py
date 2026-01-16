@@ -1,127 +1,208 @@
 import streamlit as st
 import pandas as pd
+from fpdf import FPDF
+import base64
 
 # --- 頁面設定 ---
-st.set_page_config(page_title="CC TCO 精算機 (自由輸入版)", page_icon="🚙")
+st.set_page_config(page_title="CC TCO 精算機 (災情資料庫版)", page_icon="🚙")
+st.title("🚙 CC 油電 vs. 汽油：TCO 分析報告")
 
-st.title("🚙 CC 油電 vs. 汽油：客製化 TCO 分析")
-st.markdown("### ✍️ 請直接輸入您的「入手價格」，AI 幫您算折舊與回本")
+# --- 流量計數器 (選配) ---
+st.markdown(
+    """
+    <div style="display: flex; justify-content: center;">
+        <img src="https://visit-count.netlify.app/counter?style=flat-square&count_color=%2322c55e&label=👀%20累積訪客&label_color=%23555555&page_id=CC_TCO_Calc_Engineer_Ver" alt="Visit Counter">
+    </div>
+    """,
+    unsafe_allow_html=True
+)
 
-# --- 側邊欄：使用者輸入 ---
-st.sidebar.header("1. 設定您的入手價格 (關鍵)")
-st.sidebar.info("💡 不管是新車還是二手，請輸入您談到的最終價格")
-
-# 改為完全自由輸入，預設值設為目前常見行情
-gas_car_price = st.sidebar.number_input("⛽ 汽油版 - 入手價 (元)", value=760000, step=10000)
-hybrid_car_price = st.sidebar.number_input("⚡ 油電版 - 入手價 (元)", value=880000, step=10000)
-
-# 即時顯示價差
-price_diff = hybrid_car_price - gas_car_price
-if price_diff > 0:
-    st.sidebar.write(f"👉 油電版貴了：**${price_diff:,}**")
-else:
-    st.sidebar.write(f"👉 汽油版貴了：**${abs(price_diff):,}** (罕見情況)")
-
-st.sidebar.markdown("---")
+# --- 側邊欄輸入 ---
+st.sidebar.header("1. 設定您的入手價格")
+st.sidebar.info("💡 請輸入您談到的最終成交價")
+gas_car_price = st.sidebar.number_input("⛽ 汽油版 - 入手價", value=760000, step=10000)
+hybrid_car_price = st.sidebar.number_input("⚡ 油電版 - 入手價", value=880000, step=10000)
 
 st.sidebar.header("2. 用車習慣")
 annual_km = st.sidebar.slider("每年行駛里程 (km)", 3000, 50000, 15000) 
-years_to_keep = st.sidebar.slider("預計持有幾年 (Max 10年)", 1, 10, 5)
-gas_price = st.sidebar.number_input("目前油價 (95無鉛)", value=31.0)
+years_to_keep = st.sidebar.slider("預計持有幾年", 1, 10, 5)
+gas_price = st.sidebar.number_input("目前油價", value=31.0)
 
-st.sidebar.header("3. 維修與折舊參數")
+st.sidebar.header("3. 維修參數")
 battery_cost = st.sidebar.number_input("大電池更換預算", value=49000)
-st.sidebar.caption("註：採用車商折舊公式 (首年8折, 之後-5%)")
 
 # --- 核心計算引擎 ---
-
-# 1. 定義折舊函數 (首年8折，之後每年5%)
 def get_residual_rate(year):
-    if year <= 0:
-        return 1.0
-    elif year == 1:
-        return 0.80
-    else:
-        # 公式：0.80 - ( (年數 - 1) * 0.05 )
-        rate = 0.80 - ((year - 1) * 0.05)
-        return max(rate, 0.0)
+    if year <= 0: return 1.0
+    elif year == 1: return 0.80
+    else: return max(0.80 - ((year - 1) * 0.05), 0.0)
 
-# 2. 計算殘值 (Resale Value)
 current_rate = get_residual_rate(years_to_keep)
 gas_resale_value = gas_car_price * current_rate
 hybrid_resale_value = hybrid_car_price * current_rate
 
-# 3. 基礎 TCO 計算
 total_km = annual_km * years_to_keep
-gas_mpg = 12.0
-hybrid_mpg = 21.0
-tax_gas = 11920 * years_to_keep
-tax_hybrid = 11920 * years_to_keep
+gas_fuel_cost = (total_km / 12.0) * gas_price
+hybrid_fuel_cost = (total_km / 21.0) * gas_price
+tax_total = 11920 * years_to_keep
 
-# 油錢
-gas_fuel_cost = (total_km / gas_mpg) * gas_price
-hybrid_fuel_cost = (total_km / hybrid_mpg) * gas_price
-
-# 4. 電池風險 (超過16萬公里 或 持有超過8年)
 battery_risk_cost = 0
-battery_msg = "✅ 安全範圍 (暫不計入電池成本)"
 if total_km > 160000 or years_to_keep > 8:
     battery_risk_cost = battery_cost
-    battery_msg = "⚠️ 預計需換大電池 (已計入成本)"
 
-# 5. 總結算
-# TCO = (買價 - 賣價) + 油錢 + 稅金 + 電池
-tco_gas = (gas_car_price - gas_resale_value) + gas_fuel_cost + tax_gas
-tco_hybrid = (hybrid_car_price - hybrid_resale_value) + hybrid_fuel_cost + tax_hybrid + battery_risk_cost
-
+tco_gas = (gas_car_price - gas_resale_value) + gas_fuel_cost + tax_total
+tco_hybrid = (hybrid_car_price - hybrid_resale_value) + hybrid_fuel_cost + tax_total + battery_risk_cost
 diff = tco_gas - tco_hybrid
 
-# --- 結果顯示區 ---
+# --- PDF 產生引擎 ---
+def create_pdf():
+    pdf = FPDF()
+    pdf.add_page()
+    
+    # 嘗試載入字型，失敗則跳過
+    try:
+        pdf.add_font('TaipeiSans', '', 'TaipeiSans.ttf', uni=True)
+        pdf.set_font('TaipeiSans', '', 16)
+    except:
+        st.error("❌ 系統找不到字型檔 (TaipeiSans.ttf)。請確認 GitHub 是否有上傳。")
+        return None
 
-st.header(f"📊 分析結果 ({years_to_keep}年 / {total_km:,}公里)")
+    pdf.cell(0, 10, 'Toyota Corolla Cross TCO 分析報告', ln=True, align='C')
+    pdf.ln(10)
 
+    pdf.set_font('TaipeiSans', '', 12)
+    pdf.cell(0, 10, f'分析參數：持有 {years_to_keep} 年 / 每年 {annual_km:,} 公里 / 油價 {gas_price} 元', ln=True)
+    pdf.ln(5)
+
+    pdf.set_fill_color(240, 240, 240)
+    pdf.cell(95, 10, '項目', 1, 0, 'C', 1)
+    pdf.cell(47, 10, '汽油版', 1, 0, 'C', 1)
+    pdf.cell(47, 10, '油電版', 1, 1, 'C', 1)
+
+    def add_row(name, val1, val2):
+        pdf.cell(95, 10, name, 1)
+        pdf.cell(47, 10, f"${int(val1):,}", 1, 0, 'R')
+        pdf.cell(47, 10, f"${int(val2):,}", 1, 1, 'R')
+
+    add_row("車價折舊損失 (買-賣)", gas_car_price - gas_resale_value, hybrid_car_price - hybrid_resale_value)
+    add_row("總油錢支出", gas_fuel_cost, hybrid_fuel_cost)
+    add_row("稅金總額", tax_total, tax_total)
+    add_row("大電池風險", 0, battery_risk_cost)
+    
+    pdf.cell(95, 12, "【總持有成本 TCO】", 1)
+    pdf.cell(47, 12, f"${int(tco_gas):,}", 1, 0, 'R')
+    pdf.cell(47, 12, f"${int(tco_hybrid):,}", 1, 1, 'R')
+    pdf.ln(10)
+
+    pdf.set_font('TaipeiSans', '', 14)
+    if diff > 0:
+        pdf.cell(0, 10, f"🏆 建議購買：【油電版】 (省下 ${int(diff):,})", ln=True)
+    else:
+        pdf.cell(0, 10, f"🏆 建議購買：【汽油版】 (省下 ${int(abs(diff)):,})", ln=True)
+
+    pdf.ln(20)
+    pdf.set_font('TaipeiSans', '', 10)
+    pdf.cell(0, 10, "本報告由【中油工程師 TCO 計算機】自動生成。", ln=True, align='C')
+    
+    return pdf.output(dest='S').encode('latin-1')
+
+# --- 顯示網頁內容 (結果區) ---
 col1, col2 = st.columns(2)
 with col1:
     st.metric("汽油版總花費", f"${int(tco_gas):,}")
-    st.caption(f"預估賣出價: ${int(gas_resale_value):,}")
 with col2:
     st.metric("油電版總花費", f"${int(tco_hybrid):,}", delta=f"差額 ${int(diff):,}")
-    st.caption(f"預估賣出價: ${int(hybrid_resale_value):,}")
+
+if diff > 0:
+    st.success(f"🏆 油電版獲勝！省下 **${int(diff):,}**")
+else:
+    st.error(f"🏆 汽油版獲勝！省下 **${int(abs(diff)):,}**")
 
 st.markdown("---")
 
-# 判決邏輯
-if diff > 0:
-    st.success(f"🏆 **油電版獲勝！**\n\n省下 **${int(diff):,}**\n(雖然入手貴 ${price_diff:,}，但油錢和二手價幫你賺回來了)")
-else:
-    st.error(f"🏆 **汽油版獲勝！**\n\n省下 **${int(abs(diff)):,}**\n(因為你里程太少，或者汽油版入手的價格實在太便宜了)")
-
-st.info(f"💡 電池狀態：{battery_msg}")
-
-# 詳細圖表
-st.subheader("💰 錢花去哪了？ (成本結構)")
+# 圖表區
+st.subheader("💰 成本結構拆解")
 cost_data = pd.DataFrame({
-    "項目": ["折舊損失 (買-賣)", "總油錢", "稅金", "大電池風險"],
+    "項目": ["折舊損失", "油錢", "稅金", "大電池"],
     "汽油版": [gas_car_price - gas_resale_value, gas_fuel_cost, tax_gas, 0],
     "油電版": [hybrid_car_price - hybrid_resale_value, hybrid_fuel_cost, tax_hybrid, battery_risk_cost]
 })
 st.bar_chart(cost_data.set_index("項目"))
 
-# 殘值走勢預覽
-st.subheader("📉 未來 10 年殘值預測表")
-st.caption(f"基於您輸入的入手價：汽油 ${gas_car_price:,} / 油電 ${hybrid_car_price:,}")
-
+# 殘值表格
+st.subheader("📉 未來 10 年殘值預測")
 years_range = list(range(1, 11))
 rates = [get_residual_rate(y) for y in years_range]
 resale_df = pd.DataFrame({
     "年份": years_range,
     "折舊後剩餘價值 (%)": [f"{int(r*100)}%" for r in rates],
-    "汽油版剩餘價值": [int(gas_car_price * r) for r in rates],
-    "油電版剩餘價值": [int(hybrid_car_price * r) for r in rates]
+    "汽油版殘值": [int(gas_car_price * r) for r in rates],
+    "油電版殘值": [int(hybrid_car_price * r) for r in rates]
 })
 st.dataframe(resale_df, use_container_width=True)
 
-# CTA
+st.markdown("---")
+
+# ==========================================
+# 👇 這裡是我們新加入的「災情資料庫」區塊 👇
+# ==========================================
+st.subheader("🔍 工程師的災情資料庫 (驗車必看)")
+st.caption("買車前先看缺點，才知道能不能接受。")
+
+with st.expander("🚨 全車系共同通病 (漏水/避震/車機) - 點擊展開"):
+    st.markdown("""
+    - **💦 車頂架漏水 (2020-2021前期款最慘)**
+        - **症狀：** 檢查 A 柱、C 柱飾板是否有水痕，頂蓬是否有霉味。
+        - **解法：** 原廠有召回更換防水墊片，買二手需確認是否已處理。
+    - **🤢 避震器過軟 (暈車屬性)**
+        - **症狀：** 原廠懸吊行程長且軟，後座乘客容易暈車，高速變換車道像「開船」。
+        - **建議：** 試駕時請家人坐後座感受，很多人買回後需花 2-3 萬改裝避震。
+    - **🖥️ 原廠車機 (Drive+ Connect) 災情**
+        - **症狀：** 4G 訊號連不上、導航當機、倒車顯影延遲。
+        - **建議：** 不要對原廠車機抱太大期望，改裝安卓機 (約 1.5 萬) 是常見解法。
+    """)
+
+tab1, tab2 = st.tabs(["⚡ 油電版要注意", "⛽ 汽油版要注意"])
+
+with tab1:
+    st.markdown("""
+    - **🔋 大電池散熱網堵塞 (致命傷)**
+        - **原因：** 進氣口在後座旁，容易吸入毛髮灰塵。
+        - **後果：** 散熱不良導致電池過熱，壽命從 10 年縮短剩 5 年。
+        - **檢查：** **必看後座旁濾網是否乾淨！**
+    - **🔊 煞車總泵異音**
+        - **症狀：** 踩放煞車有明顯「滋滋」電流聲。
+        - **判斷：** 輕微是正常作動音，若聲音過大可能是總泵老化 (更換極貴)。
+    """)
+
+with tab2:
+    st.markdown("""
+    - **🐢 CVT 低速頓挫感**
+        - **症狀：** 在時速 20-40 km/h 之間，收油再補油會有「拉扯感」。
+        - **判斷：** 這是 Toyota Super CVT-i 的物理特性，非故障。
+    - **📉 市區油耗落差**
+        - **注意：** 純市區行駛油耗可能只有 9-10 km/L，要有心理準備。
+    """)
+
+# ==========================================
+# 👆 災情區塊結束 👆
+# ==========================================
+
+st.markdown("---")
+
+# PDF 下載區
+st.subheader("📥 下載您的分析報告")
+if st.button("📄 生成 A4 報告 (PDF)"):
+    pdf_bytes = create_pdf()
+    if pdf_bytes:
+        st.download_button(
+            label="👉 點此下載報告",
+            data=pdf_bytes,
+            file_name="CC_TCO_Report.pdf",
+            mime="application/pdf"
+        )
+
+# CTA 變現區
 st.markdown("---")
 st.markdown("#### 想知道更詳細的驗車眉角？")
 st.markdown("👉 [**下載：CC 驗車懶人包 (PDF) - $199**](#)")
