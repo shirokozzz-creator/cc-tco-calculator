@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 from fpdf import FPDF
@@ -60,18 +61,16 @@ tco_gas = (gas_car_price - gas_resale_value) + gas_fuel_cost + tax_gas
 tco_hybrid = (hybrid_car_price - hybrid_resale_value) + hybrid_fuel_cost + tax_hybrid + battery_risk_cost
 diff = tco_gas - tco_hybrid
 
-# --- PDF 產生引擎 (Clean Version) ---
+# --- PDF 產生引擎 (fpdf2) ---
 def create_pdf():
     pdf = FPDF()
     pdf.add_page()
     
-    # 這是最關鍵的一步：直接讀取您上傳的檔案
     font_path = "TaipeiSans.ttf"
     
-    # 檢查檔案是否存在
+    # 檢查字型檔 (您的字型已經上傳成功了，這裡只是最後確認)
     if not os.path.exists(font_path):
-        st.error(f"❌ 找不到字型檔：{font_path}")
-        st.info("請確認您已在 GitHub 上傳了改名為 TaipeiSans.ttf 的字型檔。")
+        st.error(f"❌ 系統找不到字型檔：{font_path}")
         return None
         
     try:
@@ -79,7 +78,7 @@ def create_pdf():
         pdf.add_font("TaipeiSans", fname=font_path)
         pdf.set_font("TaipeiSans", size=16)
         
-        # 內容生成
+        # 內容生成 (使用 new_x/new_y 語法，確保相容性)
         pdf.cell(0, 10, "Toyota Corolla Cross TCO 分析報告", new_x="LMARGIN", new_y="NEXT", align='C')
         pdf.ln(5)
 
@@ -119,7 +118,8 @@ def create_pdf():
         pdf.set_font("TaipeiSans", size=10)
         pdf.cell(0, 10, "本報告由【中油工程師 TCO 計算機】自動生成。", align='C')
         
-        return pdf.output()
+        # 關鍵修正：強制轉成 bytes，避免 Streamlit 報錯
+        return bytes(pdf.output())
 
     except Exception as e:
         st.error(f"❌ PDF 生成失敗: {str(e)}")
@@ -169,11 +169,22 @@ with st.expander("🚨 全車系共同通病 (點擊展開)"):
     """)
 st.markdown("---")
 
+# PDF 下載區 (直接生成，不需等待)
 st.subheader("📥 下載您的分析報告")
-if st.button("📄 生成 A4 報告 (PDF)"):
-    pdf_bytes = create_pdf()
-    if pdf_bytes:
-        st.download_button("👉 點此下載報告", pdf_bytes, "CC_Report.pdf", "application/pdf")
+
+# 自動產生 PDF 資料
+pdf_bytes = create_pdf()
+
+# 顯示下載按鈕
+if pdf_bytes:
+    st.download_button(
+        label="👉 點此下載完整報告 (PDF)",
+        data=pdf_bytes,
+        file_name="CC_TCO_Report.pdf",
+        mime="application/pdf"
+    )
+else:
+    st.warning("⚠️ 報告生成中，請確認字型檔是否正確上傳...")
 
 st.markdown("---")
 st.markdown("#### 👉 [下載：CC 驗車懶人包 (PDF) - $199](#)")
