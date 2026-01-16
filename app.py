@@ -7,11 +7,13 @@ import base64
 st.set_page_config(page_title="CC TCO 精算機 (災情資料庫版)", page_icon="🚙")
 st.title("🚙 CC 油電 vs. 汽油：TCO 分析報告")
 
-# --- 流量計數器 ---
+# --- 流量計數器 (更換為穩定版) ---
+# 使用 hits.seeyoufarm.com，這是 GitHub 開發者最常用的，不會被輕易擋掉
+# 我已經把您的網址填入 url 參數中
 st.markdown(
     """
     <div style="display: flex; justify-content: center;">
-        <img src="https://visit-count.netlify.app/counter?style=flat-square&count_color=%2322c55e&label=👀%20累積訪客&label_color=%23555555&page_id=CC_TCO_Calc_Engineer_Ver" alt="Visit Counter">
+        <img src="https://hits.seeyoufarm.com/api/count/incr/badge.svg?url=https%3A%2F%2Fcc-tco-calculator-nyscfmvgcj3mfh68rtqpgh.streamlit.app&count_bg=%2322C55E&title_bg=%23555555&icon=&icon_color=%23E7E7E7&title=👀+累積訪客&edge_flat=true" alt="Visit Counter">
     </div>
     """,
     unsafe_allow_html=True
@@ -45,10 +47,10 @@ total_km = annual_km * years_to_keep
 gas_fuel_cost = (total_km / 12.0) * gas_price
 hybrid_fuel_cost = (total_km / 21.0) * gas_price
 
-# 修正點：這裡統一使用 tax_total，並為了圖表方便，定義這兩個變數
+# 統一變數名稱
 tax_total = 11920 * years_to_keep
-tax_gas = tax_total      # 修正錯誤：明確定義 tax_gas
-tax_hybrid = tax_total   # 修正錯誤：明確定義 tax_hybrid
+tax_gas = tax_total
+tax_hybrid = tax_total
 
 battery_risk_cost = 0
 if total_km > 160000 or years_to_keep > 8:
@@ -89,7 +91,7 @@ def create_pdf():
 
     add_row("車價折舊損失 (買-賣)", gas_car_price - gas_resale_value, hybrid_car_price - hybrid_resale_value)
     add_row("總油錢支出", gas_fuel_cost, hybrid_fuel_cost)
-    add_row("稅金總額", tax_gas, tax_hybrid) # 使用修正後的變數
+    add_row("稅金總額", tax_gas, tax_hybrid)
     add_row("大電池風險", 0, battery_risk_cost)
     
     pdf.cell(95, 12, "【總持有成本 TCO】", 1)
@@ -109,7 +111,7 @@ def create_pdf():
     
     return pdf.output(dest='S').encode('latin-1')
 
-# --- 顯示網頁內容 (結果區) ---
+# --- 顯示網頁內容 ---
 col1, col2 = st.columns(2)
 with col1:
     st.metric("汽油版總花費", f"${int(tco_gas):,}")
@@ -127,8 +129,8 @@ st.markdown("---")
 st.subheader("💰 成本結構拆解")
 cost_data = pd.DataFrame({
     "項目": ["折舊損失", "油錢", "稅金", "大電池"],
-    "汽油版": [gas_car_price - gas_resale_value, gas_fuel_cost, tax_gas, 0], # 修正點：這裡現在讀得到了
-    "油電版": [hybrid_car_price - hybrid_resale_value, hybrid_fuel_cost, tax_hybrid, battery_risk_cost] # 修正點
+    "汽油版": [gas_car_price - gas_resale_value, gas_fuel_cost, tax_gas, 0],
+    "油電版": [hybrid_car_price - hybrid_resale_value, hybrid_fuel_cost, tax_hybrid, battery_risk_cost]
 })
 st.bar_chart(cost_data.set_index("項目"))
 
@@ -146,7 +148,7 @@ st.dataframe(resale_df, use_container_width=True)
 
 st.markdown("---")
 
-# --- 災情資料庫區塊 ---
+# 災情資料庫
 st.subheader("🔍 工程師的災情資料庫 (驗車必看)")
 st.caption("買車前先看缺點，才知道能不能接受。")
 
