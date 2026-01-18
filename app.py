@@ -4,7 +4,7 @@ from fpdf import FPDF
 import os
 import time
 import math
-import altair as alt # 🔥 新增：引入高階繪圖庫
+import altair as alt
 
 # --- 頁面設定 ---
 st.set_page_config(page_title="航太級 TCO 精算機", page_icon="✈️")
@@ -15,14 +15,14 @@ st.markdown(
     """
     <div style="display: flex; gap: 10px;">
         <img src="https://img.shields.io/badge/Data-Real_Auction_Verified-0052CC?style=flat-square" alt="Data">
-        <img src="https://img.shields.io/badge/Chart-Golden_Cross_Marked-FF4B4B?style=flat-square" alt="Chart">
+        <img src="https://img.shields.io/badge/Chart-Logic_Fixed-success?style=flat-square" alt="Fixed">
     </div>
     <br>
     """,
     unsafe_allow_html=True
 )
 
-st.caption("🚀 系統更新：新增「黃金交叉點」自動標記功能，回本時間一目了然。")
+st.caption("🚀 系統更新：修正圖表第0年定義誤差，呈現真實「累積淨損失」曲線。")
 
 # --- 側邊欄輸入 ---
 st.sidebar.header("1. 設定您的入手價格")
@@ -41,15 +41,19 @@ force_battery = st.sidebar.checkbox("⚠️ 強制列入電池更換費", value=
 
 # --- [核心] 大數據折舊模型 ---
 def get_resale_value(initial_price, year, car_type):
-    if year <= 0: return initial_price
+    # 落地折舊參數 (根據 2026 拍賣場數據)
     if car_type == 'gas':
         k = 0.096
-        initial_drop = 0.82
+        initial_drop = 0.82 # 汽油版第一年剩 82%
     else:
         k = 0.104
-        initial_drop = 0.80
+        initial_drop = 0.80 # 油電版第一年剩 80%
 
-    if year == 1:
+    if year == 0:
+        # 第0年(落地當下)的殘值 = 原價 * 落地折數
+        # 這樣計算第0年的損失才不會是0，而是「落地折舊費」
+        return initial_price * initial_drop
+    elif year == 1:
         return initial_price * initial_drop
     else:
         p1 = initial_price * initial_drop
@@ -57,44 +61,47 @@ def get_resale_value(initial_price, year, car_type):
 
 # --- 數據計算 & 尋找黃金交叉點 ---
 chart_data_rows = []
-cross_point = None # 用來存交叉點資料
+cross_point = None 
+previous_diff = None 
 
-# 為了畫出平滑的線與精準交叉點，我們在後台多算一點數據
-previous_diff = None # 用來偵測何時交叉
-
-for y in range(0, 13): # 從第0年(買車當下)開始算
-    # 第0年 = 原價
-    if y == 0:
-        g_total = gas_car_price
-        h_total = hybrid_car_price
-    else:
-        g_resale = get_resale_value(gas_car_price, y, 'gas')
-        h_resale = get_resale_value(hybrid_car_price, y, 'hybrid')
-        g_total = (gas_car_price - g_resale) + ((annual_km * y / 12.0) * gas_price) + (11920 * y)
+# 從第0年開始算，到第12年
+for y in range(0, 13): 
+    # 計算該年份的殘值
+    g_resale = get_resale_value(gas_car_price, y, 'gas')
+    h_resale = get_resale_value(hybrid_car_price, y, 'hybrid')
+    
+    # 計算累積花費 (TCO) = 折舊損失 + 油錢 + 稅金 + 維修
+    # 第0年：雖然里程是0，但已經產生「落地折舊損失」
+    
+    # 汽油版累積成本
+    g_depreciation = gas_car_price - g_resale
+    g_fuel = (annual_km * y / 12.0) * gas_price
+    g_tax = 11920 * y
+    g_total = g_depreciation + g_fuel + g_tax
+    
+    # 油電版累積成本
+    h_depreciation = hybrid_car_price - h_resale
+    h_fuel = (annual_km * y / 21.0) * gas_price
+    h_tax = 11920 * y
+    
+    h_bat = 0
+    # 邏輯：超過8年或16萬公里才計入電池
+    if force_battery or (annual_km * y > 160000) or (y > 8):
+        h_bat = battery_cost
         
-        h_bat = 0
-        if force_battery or (annual_km * y > 160000) or (y > 8):
-            h_bat = battery_cost
-        h_total = (hybrid_car_price - h_resale) + ((annual_km * y / 21.0) * gas_price) + (11920 * y) + h_bat
+    h_total = h_depreciation + h_fuel + h_tax + h_bat
 
     chart_data_rows.append({"年份": y, "車型": "汽油版", "累積花費": int(g_total)})
     chart_data_rows.append({"年份": y, "車型": "油電版", "累積花費": int(h_total)})
 
     # --- 計算交叉點邏輯 (線性插值) ---
-    # 邏輯：如果上一年的 (汽油-油電) 是負的，今年變成正的，代表剛剛交叉了
     current_diff = g_total - h_total
     
     if y > 0 and previous_diff is not None:
         if previous_diff < 0 and current_diff >= 0:
-            # 找到交叉區間了！(從 y-1 到 y 之間)
-            # 使用線性插值算出精確的 X (年份)
-            # 公式：X = (y-1) + (abs(prev_diff) / (abs(prev_diff) + curr_diff))
             fraction = abs(previous_diff) / (abs(previous_diff) + current_diff)
             exact_year = (y - 1) + fraction
-            
-            # 算出精確的 Y (花費)
-            # 取汽油版的花費來做插值
-            prev_cost = chart_data_rows[-4]["累積花費"] # y-1 的汽油花費
+            prev_cost = chart_data_rows[-4]["累積花費"] 
             curr_cost = g_total
             exact_cost = prev_cost + (curr_cost - prev_cost) * fraction
             
@@ -134,7 +141,7 @@ def create_pdf():
         pdf.cell(0, 10, "Toyota Corolla Cross TCO 分析報告", new_x="LMARGIN", new_y="NEXT", align='C')
         pdf.ln(5)
         pdf.set_font("TaipeiSans", size=10)
-        pdf.cell(0, 10, f"參數：持有 {years_to_keep} 年 / 每年 {annual_km:,} km", new_x="LMARGIN", new_y="NEXT")
+        pdf.cell(0, 10, f"參數：持有 {years_to_keep} 年 / 每年 {annual_km:,} km", new_x="LMARGIN", new_y="NEXT", align='C')
         
         pdf.set_font("TaipeiSans", size=12)
         pdf.set_fill_color(240, 240, 240)
@@ -181,8 +188,7 @@ def create_pdf():
 st.subheader("📈 成本累積圖 (含黃金交叉標記)")
 st.caption("紅線=汽油，藍線=油電。我們幫您算出了精確的回本時間點。")
 
-# 🔥 使用 Altair 繪製高階圖表
-# 1. 基礎線圖
+# 🔥 Altair 圖表 (修正版)
 base = alt.Chart(chart_df).encode(
     x=alt.X('年份', axis=alt.Axis(title='持有年份', tickMinStep=1)),
     y=alt.Y('累積花費', axis=alt.Axis(title='累積總損失 (NTD)')),
@@ -190,28 +196,17 @@ base = alt.Chart(chart_df).encode(
 )
 lines = base.mark_line(strokeWidth=3)
 
-# 2. 組合圖表
 if cross_point:
-    # 交叉點資料
     cross_df = pd.DataFrame([cross_point])
-    
-    # 畫紅點
     points = alt.Chart(cross_df).mark_point(
         color='red', size=200, filled=True, shape='diamond'
-    ).encode(
-        x='年份', y='花費'
-    )
+    ).encode(x='年份', y='花費')
     
-    # 畫文字標籤
     text = alt.Chart(cross_df).mark_text(
         align='left', baseline='bottom', dx=10, dy=-10, fontSize=16, fontWeight='bold', color='red'
-    ).encode(
-        x='年份', y='花費', text='標籤'
-    )
+    ).encode(x='年份', y='花費', text='標籤')
     
     final_chart = (lines + points + text).interactive()
-    
-    # 顯示文字結論
     st.success(f"🎯 **數據發現：** 兩車成本將在 **第 {cross_point['年份']:.1f} 年** 黃金交叉！此後油電版開始倒賺。")
 else:
     final_chart = lines.interactive()
