@@ -15,14 +15,14 @@ st.markdown(
     """
     <div style="display: flex; gap: 10px;">
         <img src="https://img.shields.io/badge/Data-Real_Auction_Verified-0052CC?style=flat-square" alt="Data">
-        <img src="https://img.shields.io/badge/Chart-Golden_Cross_Marked-FF4B4B?style=flat-square" alt="Chart">
+        <img src="https://img.shields.io/badge/Feature-Resale_Prediction-orange?style=flat-square" alt="Feature">
     </div>
     <br>
     """,
     unsafe_allow_html=True
 )
 
-st.caption("🚀 系統更新：回歸雙線分析，精準標記「黃金交叉點」。")
+st.caption("🚀 系統更新：新增「未來 10 年二手價預測表」，數據源自真實拍賣成交紀錄。")
 
 # --- 側邊欄輸入 ---
 st.sidebar.header("1. 設定您的入手價格")
@@ -49,7 +49,6 @@ def get_resale_value(initial_price, year, car_type):
         k = 0.104
         initial_drop = 0.80 
 
-    # 統一從第0年開始算落地折舊，讓曲線平滑
     if year == 0:
         return initial_price * initial_drop
     elif year == 1:
@@ -72,12 +71,10 @@ for y in range(0, 13):
     # 2. 汽油累積成本
     g_total = (gas_car_price - g_resale) + ((annual_km * y / 12.0) * gas_price) + (11920 * y)
     
-    # 3. 油電累積成本 (含電池邏輯)
+    # 3. 油電累積成本
     h_bat = 0
-    # 邏輯：強制勾選 OR 里程>16萬 OR 年份>8年 -> 只有一條線，條件到了就往上跳
     if force_battery or (annual_km * y > 160000) or (y > 8):
         h_bat = battery_cost
-        
     h_total = (hybrid_car_price - h_resale) + ((annual_km * y / 21.0) * gas_price) + (11920 * y) + h_bat
 
     chart_data_rows.append({"年份": y, "車型": "汽油版", "累積花費": int(g_total)})
@@ -87,13 +84,10 @@ for y in range(0, 13):
     curr_diff = g_total - h_total
     
     if y > 0 and prev_diff is not None:
-        # 如果上一年是負的(汽油便宜)，今年變成正的(油電便宜)，代表交叉了
         if prev_diff < 0 and curr_diff >= 0:
             frac = abs(prev_diff) / (abs(prev_diff) + curr_diff)
             exact_year = (y - 1) + frac
-            
-            # 算出交叉點的 Y 值 (花費)
-            prev_cost = chart_data_rows[-4]["累積花費"] # 取上一年的汽油花費
+            prev_cost = chart_data_rows[-4]["累積花費"] 
             curr_cost = g_total
             exact_cost = prev_cost + (curr_cost - prev_cost) * frac
             
@@ -102,12 +96,11 @@ for y in range(0, 13):
                 "花費": exact_cost,
                 "標籤": f"★ 第 {exact_year:.1f} 年回本"
             }
-            
     prev_diff = curr_diff
 
 chart_df = pd.DataFrame(chart_data_rows)
 
-# --- 單點計算 (Metrics用) ---
+# --- 單點計算 ---
 gas_resale_final = get_resale_value(gas_car_price, years_to_keep, 'gas')
 hybrid_resale_final = get_resale_value(hybrid_car_price, years_to_keep, 'hybrid')
 total_km = annual_km * years_to_keep
@@ -182,7 +175,7 @@ def create_pdf():
 st.subheader("📈 成本累積圖 (含黃金交叉標記)")
 st.caption("紅線=汽油，藍線=油電。系統已自動計算精確的回本時間。")
 
-# 🔥 Altair 雙線圖 (簡單有力)
+# Altair 雙線圖
 base = alt.Chart(chart_df).encode(
     x=alt.X('年份', axis=alt.Axis(title='持有年份', tickMinStep=1)),
     y=alt.Y('累積花費', axis=alt.Axis(title='累積總損失 (NTD)')),
@@ -192,15 +185,12 @@ lines = base.mark_line(strokeWidth=3)
 
 if cross_point:
     cross_df = pd.DataFrame([cross_point])
-    # 畫大紅鑽石
     points = alt.Chart(cross_df).mark_point(
         color='red', size=300, filled=True, shape='diamond'
     ).encode(x='年份', y='花費')
-    # 畫文字
     text = alt.Chart(cross_df).mark_text(
         align='left', baseline='bottom', dx=10, dy=-10, fontSize=16, fontWeight='bold', color='red'
     ).encode(x='年份', y='花費', text='標籤')
-    
     final_chart = (lines + points + text).interactive()
     st.success(f"🎯 **數據發現：** 兩車成本將在 **第 {cross_point['年份']:.1f} 年** 黃金交叉！")
 else:
@@ -211,19 +201,38 @@ st.altair_chart(final_chart, use_container_width=True)
 
 # 數據面板
 col1, col2 = st.columns(2)
-with col1:
-    st.metric("汽油版總花費", f"${int(tco_gas):,}")
-with col2:
-    st.metric("油電版總花費", f"${int(tco_hybrid):,}", delta=f"差額 ${int(diff):,}")
+with col1: st.metric("汽油版總花費", f"${int(tco_gas):,}")
+with col2: st.metric("油電版總花費", f"${int(tco_hybrid):,}", delta=f"差額 ${int(diff):,}")
 
-# 電池狀態提示 (回應您的需求)
 if battery_risk_cost > 0:
     st.info(f"💡 提醒：目前的藍線**已包含**大電池更換成本 (${int(battery_cost):,})。")
 else:
     st.info("💡 提醒：目前的藍線**尚未**計入大電池成本 (里程/年份未達標)。")
 
 st.markdown("---")
-# 🔥 災情表 (保留)
+
+# 🔥 [新增功能] 未來 10 年二手價預測表
+st.subheader("📉 未來 10 年二手價預測表 (大數據模型)")
+st.markdown("👉 **資料來源標記：以參考 2025-2026 二手車實際成交價格 (拍賣場行情)**")
+
+# 建立預測表格資料
+resale_data = []
+for y in range(1, 11):
+    g_val = get_resale_value(gas_car_price, y, 'gas')
+    h_val = get_resale_value(hybrid_car_price, y, 'hybrid')
+    resale_data.append({
+        "車齡": f"第 {y} 年",
+        "汽油版殘值 (萬)": f"{g_val/10000:.1f}",
+        "油電版殘值 (萬)": f"{h_val/10000:.1f}",
+        "油電優勢 (萬)": f"+{(h_val - g_val)/10000:.1f}"
+    })
+
+resale_df = pd.DataFrame(resale_data)
+st.dataframe(resale_df, use_container_width=True)
+st.caption("註：此價格為預估車行收購/拍賣行情，實際價格視車況與市場波動而定。")
+
+st.markdown("---")
+# 災情表
 st.subheader("🔍 航太工程師的災情資料庫")
 with st.expander("🚨 機體與系統通病列表 (點擊展開)", expanded=True):
     st.markdown("""
