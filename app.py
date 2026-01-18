@@ -15,14 +15,15 @@ st.markdown(
     """
     <div style="display: flex; gap: 10px;">
         <img src="https://img.shields.io/badge/Data-Real_Auction_Verified-0052CC?style=flat-square" alt="Data">
-        <img src="https://img.shields.io/badge/Chart-Logic_Fixed-success?style=flat-square" alt="Fixed">
+        <img src="https://img.shields.io/badge/Scenario-Dual_Analysis-orange?style=flat-square" alt="Scenario">
+        <img src="https://img.shields.io/badge/Status-Defects_List_Restored-success?style=flat-square" alt="Status">
     </div>
     <br>
     """,
     unsafe_allow_html=True
 )
 
-st.caption("🚀 系統更新：修正圖表第0年定義誤差，呈現真實「累積淨損失」曲線。")
+st.caption("🚀 系統更新：新增「換電池 vs 免換電池」雙情境分析，並修復災情表顯示。")
 
 # --- 側邊欄輸入 ---
 st.sidebar.header("1. 設定您的入手價格")
@@ -37,21 +38,19 @@ gas_price = st.sidebar.number_input("目前油價", value=31.0)
 
 st.sidebar.header("3. 維修參數 (飛安係數)")
 battery_cost = st.sidebar.number_input("大電池更換預算", value=49000)
-force_battery = st.sidebar.checkbox("⚠️ 強制列入電池更換費", value=False)
+st.sidebar.caption("註：圖表將同時顯示「換」與「不換」的兩條曲線供您參考。")
 
 # --- [核心] 大數據折舊模型 ---
 def get_resale_value(initial_price, year, car_type):
     # 落地折舊參數 (根據 2026 拍賣場數據)
     if car_type == 'gas':
         k = 0.096
-        initial_drop = 0.82 # 汽油版第一年剩 82%
+        initial_drop = 0.82 
     else:
         k = 0.104
-        initial_drop = 0.80 # 油電版第一年剩 80%
+        initial_drop = 0.80 
 
     if year == 0:
-        # 第0年(落地當下)的殘值 = 原價 * 落地折數
-        # 這樣計算第0年的損失才不會是0，而是「落地折舊費」
         return initial_price * initial_drop
     elif year == 1:
         return initial_price * initial_drop
@@ -59,75 +58,77 @@ def get_resale_value(initial_price, year, car_type):
         p1 = initial_price * initial_drop
         return p1 * math.exp(-k * (year - 1))
 
-# --- 數據計算 & 尋找黃金交叉點 ---
+# --- 數據計算 & 雙重情境分析 ---
 chart_data_rows = []
-cross_point = None 
-previous_diff = None 
+cross_point_opt = None # 樂觀情境 (免換電池)
+cross_point_pes = None # 悲觀情境 (換電池)
+prev_diff_opt = None
+prev_diff_pes = None
 
 # 從第0年開始算，到第12年
 for y in range(0, 13): 
-    # 計算該年份的殘值
+    # 1. 基礎數據
     g_resale = get_resale_value(gas_car_price, y, 'gas')
     h_resale = get_resale_value(hybrid_car_price, y, 'hybrid')
     
-    # 計算累積花費 (TCO) = 折舊損失 + 油錢 + 稅金 + 維修
-    # 第0年：雖然里程是0，但已經產生「落地折舊損失」
-    
-    # 汽油版累積成本
-    g_depreciation = gas_car_price - g_resale
+    # 2. 汽油版累積成本 (基準線)
+    g_dep = gas_car_price - g_resale
     g_fuel = (annual_km * y / 12.0) * gas_price
     g_tax = 11920 * y
-    g_total = g_depreciation + g_fuel + g_tax
+    g_total = g_dep + g_fuel + g_tax
     
-    # 油電版累積成本
-    h_depreciation = hybrid_car_price - h_resale
+    # 3. 油電版 (基礎成本)
+    h_dep = hybrid_car_price - h_resale
     h_fuel = (annual_km * y / 21.0) * gas_price
     h_tax = 11920 * y
+    h_base = h_dep + h_fuel + h_tax
     
-    h_bat = 0
-    # 邏輯：超過8年或16萬公里才計入電池
-    if force_battery or (annual_km * y > 160000) or (y > 8):
-        h_bat = battery_cost
-        
-    h_total = h_depreciation + h_fuel + h_tax + h_bat
-
-    chart_data_rows.append({"年份": y, "車型": "汽油版", "累積花費": int(g_total)})
-    chart_data_rows.append({"年份": y, "車型": "油電版", "累積花費": int(h_total)})
-
-    # --- 計算交叉點邏輯 (線性插值) ---
-    current_diff = g_total - h_total
+    # 情境 A: 免換電池 (Optimistic)
+    h_total_opt = h_base
     
-    if y > 0 and previous_diff is not None:
-        if previous_diff < 0 and current_diff >= 0:
-            fraction = abs(previous_diff) / (abs(previous_diff) + current_diff)
-            exact_year = (y - 1) + fraction
-            prev_cost = chart_data_rows[-4]["累積花費"] 
-            curr_cost = g_total
-            exact_cost = prev_cost + (curr_cost - prev_cost) * fraction
-            
-            cross_point = {
-                "年份": exact_year,
-                "花費": exact_cost,
-                "標籤": f"★ 黃金交叉：第 {exact_year:.1f} 年"
-            }
-            
-    previous_diff = current_diff
+    # 情境 B: 換電池 (Pessimistic) - 假設第 8 年或 16萬公里發生
+    # 為了圖表平滑，我們設定如果 y >= 8 就加上去，讓線跳起來
+    h_bat_cost = 0
+    if (annual_km * y > 160000) or (y >= 8):
+        h_bat_cost = battery_cost
+    h_total_pes = h_base + h_bat_cost
+
+    # 寫入圖表數據
+    chart_data_rows.append({"年份": y, "情境": "1. 汽油版", "累積花費": int(g_total)})
+    chart_data_rows.append({"年份": y, "情境": "2. 油電 (免換電池)", "累積花費": int(h_total_opt)})
+    chart_data_rows.append({"年份": y, "情境": "3. 油電 (需換電池)", "累積花費": int(h_total_pes)})
+
+    # --- 計算交叉點 (雙軌制) ---
+    # 1. 樂觀交叉
+    curr_diff_opt = g_total - h_total_opt
+    if y > 0 and prev_diff_opt is not None:
+        if prev_diff_opt < 0 and curr_diff_opt >= 0:
+            frac = abs(prev_diff_opt) / (abs(prev_diff_opt) + curr_diff_opt)
+            cross_point_opt = (y - 1) + frac
+    prev_diff_opt = curr_diff_opt
+    
+    # 2. 悲觀交叉
+    curr_diff_pes = g_total - h_total_pes
+    if y > 0 and prev_diff_pes is not None:
+        if prev_diff_pes < 0 and curr_diff_pes >= 0:
+            frac = abs(prev_diff_pes) / (abs(prev_diff_pes) + curr_diff_pes)
+            cross_point_pes = (y - 1) + frac
+    prev_diff_pes = curr_diff_pes
 
 chart_df = pd.DataFrame(chart_data_rows)
 
-# --- 單點計算 (PDF與數據用) ---
-gas_resale_final = get_resale_value(gas_car_price, years_to_keep, 'gas')
-hybrid_resale_final = get_resale_value(hybrid_car_price, years_to_keep, 'hybrid')
-total_km = annual_km * years_to_keep
-battery_risk_cost = 0
-battery_status_msg = "✅ 系統檢測正常"
-if force_battery or total_km > 160000 or years_to_keep > 8:
-    battery_risk_cost = battery_cost
-    battery_status_msg = "⚠️ 風險預警：已計入電池更換"
+# --- 單點計算 (用於 Metrics 與 PDF) ---
+# 這裡我們計算持有年限(years_to_keep)當下的狀況
+gas_final = (gas_car_price - get_resale_value(gas_car_price, years_to_keep, 'gas')) + \
+            ((annual_km * years_to_keep / 12.0) * gas_price) + (11920 * years_to_keep)
 
-tco_gas = (gas_car_price - gas_resale_final) + ((total_km / 12.0) * gas_price) + (11920 * years_to_keep)
-tco_hybrid = (hybrid_car_price - hybrid_resale_final) + ((total_km / 21.0) * gas_price) + (11920 * years_to_keep) + battery_risk_cost
-diff = tco_gas - tco_hybrid
+h_base_final = (hybrid_car_price - get_resale_value(hybrid_car_price, years_to_keep, 'hybrid')) + \
+               ((annual_km * years_to_keep / 21.0) * gas_price) + (11920 * years_to_keep)
+
+# 判斷當下是否已經超過電池更換期
+bat_is_due = (annual_km * years_to_keep > 160000) or (years_to_keep >= 8)
+h_final_opt = h_base_final
+h_final_pes = h_base_final + (battery_cost if bat_is_due else 0)
 
 # --- PDF 引擎 ---
 def create_pdf():
@@ -145,38 +146,31 @@ def create_pdf():
         
         pdf.set_font("TaipeiSans", size=12)
         pdf.set_fill_color(240, 240, 240)
-        pdf.cell(95, 10, "項目", border=1, align='C', fill=True)
-        pdf.cell(47, 10, "汽油版", border=1, align='C', fill=True)
-        pdf.cell(47, 10, "油電版", border=1, new_x="LMARGIN", new_y="NEXT", align='C', fill=True)
+        pdf.cell(65, 10, "項目", border=1, align='C', fill=True)
+        pdf.cell(40, 10, "汽油版", border=1, align='C', fill=True)
+        pdf.cell(40, 10, "油電(免換)", border=1, align='C', fill=True)
+        pdf.cell(40, 10, "油電(換電)", border=1, new_x="LMARGIN", new_y="NEXT", align='C', fill=True)
 
-        def add_row(name, val1, val2):
-            pdf.cell(95, 10, str(name), border=1)
-            pdf.cell(47, 10, f"${int(val1):,}", border=1, align='R')
-            pdf.cell(47, 10, f"${int(val2):,}", border=1, new_x="LMARGIN", new_y="NEXT", align='R')
+        def add_row_3(name, v1, v2, v3):
+            pdf.cell(65, 10, str(name), border=1)
+            pdf.cell(40, 10, f"${int(v1):,}", border=1, align='R')
+            pdf.cell(40, 10, f"${int(v2):,}", border=1, align='R')
+            pdf.cell(40, 10, f"${int(v3):,}", border=1, new_x="LMARGIN", new_y="NEXT", align='R')
 
-        add_row("車價折舊損失", gas_car_price - gas_resale_final, hybrid_car_price - hybrid_resale_final)
-        add_row("總油錢支出", (total_km / 12.0) * gas_price, (total_km / 21.0) * gas_price)
-        add_row("稅金總額", 11920 * years_to_keep, 11920 * years_to_keep)
-        add_row("大電池風險", 0, battery_risk_cost)
-        
-        pdf.cell(95, 12, "【總持有成本 TCO】", border=1)
-        pdf.cell(47, 12, f"${int(tco_gas):,}", border=1, align='R')
-        pdf.cell(47, 12, f"${int(tco_hybrid):,}", border=1, new_x="LMARGIN", new_y="NEXT", align='R')
+        # 這裡簡化顯示，直接秀總 TCO
+        add_row_3("總持有成本 (TCO)", gas_final, h_final_opt, h_final_pes)
         
         pdf.ln(5)
-        pdf.set_font("TaipeiSans", size=14)
-        if diff > 0:
-            pdf.cell(0, 10, f"🏆 建議：【油電版】 (省 ${int(diff):,})", new_x="LMARGIN", new_y="NEXT")
-        else:
-            pdf.cell(0, 10, f"🏆 建議：【汽油版】 (省 ${int(abs(diff)):,})", new_x="LMARGIN", new_y="NEXT")
+        diff_opt = gas_final - h_final_opt
+        diff_pes = gas_final - h_final_pes
         
-        if cross_point:
-             pdf.cell(0, 10, f"⚡ 回本時間點：{cross_point['標籤']}", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_font("TaipeiSans", size=11)
+        pdf.cell(0, 10, f"情境 A (運氣好)：油電省下 ${int(diff_opt):,}", new_x="LMARGIN", new_y="NEXT")
+        pdf.cell(0, 10, f"情境 B (需換電)：油電省下 ${int(diff_pes):,}", new_x="LMARGIN", new_y="NEXT")
 
-        pdf.ln(5)
+        pdf.ln(10)
         pdf.set_fill_color(255, 240, 240)
         pdf.cell(0, 10, "⚠️ 重點災情檢查表 (驗車必看)", fill=True, new_x="LMARGIN", new_y="NEXT")
-        pdf.set_font("TaipeiSans", size=11)
         pdf.ln(3)
         issues = ["1. 車頂架漏水 (A/C柱水痕)", "2. 避震器過軟 (暈車)", "3. 車機死機/訊號差", "4. 油電電池濾網清潔", "5. 煞車總泵滋滋聲", "6. CVT低速頓挫"]
         for i in issues: pdf.cell(0, 8, i, new_x="LMARGIN", new_y="NEXT")
@@ -185,45 +179,65 @@ def create_pdf():
     except: return None
 
 # --- 顯示網頁 ---
-st.subheader("📈 成本累積圖 (含黃金交叉標記)")
-st.caption("紅線=汽油，藍線=油電。我們幫您算出了精確的回本時間點。")
+st.subheader("📈 雙情境成本分析圖")
+st.caption("同時比較「換電池」與「不換電池」的成本差異。")
 
-# 🔥 Altair 圖表 (修正版)
+# 🔥 Altair 三線圖
 base = alt.Chart(chart_df).encode(
     x=alt.X('年份', axis=alt.Axis(title='持有年份', tickMinStep=1)),
     y=alt.Y('累積花費', axis=alt.Axis(title='累積總損失 (NTD)')),
-    color=alt.Color('車型', scale=alt.Scale(domain=['汽油版', '油電版'], range=['#FF4B4B', '#0052CC']))
+    color=alt.Color('情境', scale=alt.Scale(
+        domain=['1. 汽油版', '2. 油電 (免換電池)', '3. 油電 (需換電池)'],
+        range=['#FF4B4B', '#0052CC', '#FFA500'] # 紅、藍、橘
+    )),
+    strokeDash=alt.condition(
+        alt.datum['情境'] == '3. 油電 (需換電池)',
+        alt.value([5, 5]),  # 虛線
+        alt.value([0])      # 實線
+    )
 )
-lines = base.mark_line(strokeWidth=3)
+lines = base.mark_line(strokeWidth=3).interactive()
 
-if cross_point:
-    cross_df = pd.DataFrame([cross_point])
-    points = alt.Chart(cross_df).mark_point(
-        color='red', size=200, filled=True, shape='diamond'
-    ).encode(x='年份', y='花費')
-    
-    text = alt.Chart(cross_df).mark_text(
-        align='left', baseline='bottom', dx=10, dy=-10, fontSize=16, fontWeight='bold', color='red'
-    ).encode(x='年份', y='花費', text='標籤')
-    
-    final_chart = (lines + points + text).interactive()
-    st.success(f"🎯 **數據發現：** 兩車成本將在 **第 {cross_point['年份']:.1f} 年** 黃金交叉！此後油電版開始倒賺。")
+st.altair_chart(lines, use_container_width=True)
+
+# 交叉點情報
+msg = ""
+if cross_point_opt:
+    msg += f"✅ **運氣好 (免換電池)：** 第 {cross_point_opt:.1f} 年回本\n\n"
+if cross_point_pes:
+    msg += f"⚠️ **運氣差 (換大電池)：** 第 {cross_point_pes:.1f} 年回本\n\n"
 else:
-    final_chart = lines.interactive()
-    st.warning("⚠️ 在目前的里程參數下，油電版可能需要開超過 12 年才能回本 (或無法回本)。")
+    msg += f"⚠️ **運氣差 (換大電池)：** 目前參數下，持有期間內尚未回本"
 
-st.altair_chart(final_chart, use_container_width=True)
+st.success(msg)
 
-# 數據面板
-col1, col2 = st.columns(2)
-with col1: st.metric("汽油版總花費", f"${int(tco_gas):,}")
-with col2: st.metric("油電版總花費", f"${int(tco_hybrid):,}", delta=f"差額 ${int(diff):,}")
+# 數據面板 (三欄位)
+col1, col2, col3 = st.columns(3)
+with col1:
+    st.metric("1. 汽油版 TCO", f"${int(gas_final):,}")
+with col2:
+    diff_opt = gas_final - h_final_opt
+    st.metric("2. 油電 (免換)", f"${int(h_final_opt):,}", delta=f"省 ${int(diff_opt):,}")
+with col3:
+    diff_pes = gas_final - h_final_pes
+    st.metric("3. 油電 (換電)", f"${int(h_final_pes):,}", delta=f"省 ${int(diff_pes):,}")
 
 st.markdown("---")
+# 🔥 [修復] 災情表回歸
+st.subheader("🔍 航太工程師的災情資料庫")
+with st.expander("🚨 機體與系統通病列表 (點擊展開)", expanded=True):
+    st.markdown("""
+    - **💦 機體結構 (漏水)**：20-21年式車頂架防水墊片瑕疵，**風險等級：高**。
+    - **🤢 懸吊系統 (軟腳)**：原廠設定舒適取向，導致動態不穩，**建議方案：更換改裝避震**。
+    - **🖥️ 航電系統 (車機)**：原廠 Drive+ Connect 穩定度不足，**建議方案：改裝安卓機**。
+    - **⚡ 動力系統 (散熱)**：油電版大電池濾網需定期清潔，避免高溫導致壽命縮短。
+    """)
+st.markdown("---")
+
 # PDF 下載區
 pdf_bytes = create_pdf()
 if pdf_bytes:
-    st.download_button("👉 下載完整 PDF 報告", pdf_bytes, "CC_Aero_Report.pdf", "application/pdf")
+    st.download_button("👉 下載 PDF 報告 (含雙情境分析)", pdf_bytes, "CC_Aero_Report.pdf", "application/pdf")
 
 st.markdown("---")
 # 假門測試
