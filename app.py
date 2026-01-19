@@ -21,7 +21,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-st.caption("🚀 系統狀態：v23.0 穩定版 (含候補名單功能)")
+st.caption("🚀 系統狀態：已還原至「經典表格版」PDF 報告。")
 
 # --- 側邊欄輸入 ---
 st.sidebar.header("1. 設定您的入手價格")
@@ -108,12 +108,12 @@ tco_gas = (gas_car_price - gas_resale_final) + ((total_km / 12.0) * gas_price) +
 tco_hybrid = (hybrid_car_price - hybrid_resale_final) + ((total_km / 21.0) * gas_price) + (11920 * years_to_keep) + battery_risk_cost
 diff = tco_gas - tco_hybrid
 
-# --- PDF 引擎 (最簡化穩定版) ---
+# --- PDF 引擎 (經典表格版 - 對應您的截圖) ---
 def create_pdf():
     pdf = FPDF()
     pdf.add_page()
     
-    # 這裡只做最簡單的檢查，防止崩潰
+    # 檢查中文字型
     font_path = "TaipeiSans.ttf"
     use_chinese = False
     
@@ -123,35 +123,87 @@ def create_pdf():
             pdf.set_font("TaipeiSans", size=16)
             use_chinese = True
         except:
-            pass # 載入失敗就放棄
+            pass 
 
     if not use_chinese:
-        # 如果沒字型，就用預設的，雖然中文會亂碼，但至少按鈕會在
-        pdf.set_font("Arial", size=14)
-        st.toast("⚠️ 系統提示：找不到 TaipeiSans.ttf，PDF 中文可能無法顯示。", icon="ℹ️")
+        pdf.set_font("Arial", size=16)
+        st.toast("⚠️ 提示：缺少 TaipeiSans.ttf，PDF 將顯示為英文。", icon="ℹ️")
 
-    # 寫入標題 (如果沒中文字型，這裡會是亂碼，但檔案可下載)
+    # 1. 標題 (對應截圖上方)
+    title_text = "Toyota Corolla Cross TCO 分析報告" if use_chinese else "Toyota Corolla Cross TCO Report"
+    pdf.cell(0, 10, title_text, new_x="LMARGIN", new_y="NEXT", align='C')
+    
+    pdf.ln(5)
+    
+    # 2. 參數 (對應截圖副標題)
+    pdf.set_font("TaipeiSans" if use_chinese else "Arial", size=10)
+    param_text = f"參數：持有 {years_to_keep} 年 / 每年 {annual_km:,} km" if use_chinese else f"Params: {years_to_keep} Years / {annual_km:,} km/yr"
+    pdf.cell(0, 10, param_text, new_x="LMARGIN", new_y="NEXT", align='C')
+    
+    # 3. 表格 (對應截圖中間的大表格)
+    pdf.set_font("TaipeiSans" if use_chinese else "Arial", size=12)
+    pdf.set_fill_color(240, 240, 240) # 灰色底
+    
+    # 表頭
+    h_item = "項目" if use_chinese else "Item"
+    h_gas = "汽油版" if use_chinese else "Gas"
+    h_hyb = "油電版" if use_chinese else "Hybrid"
+    
+    pdf.cell(95, 10, h_item, border=1, align='C', fill=True)
+    pdf.cell(47, 10, h_gas, border=1, align='C', fill=True)
+    pdf.cell(47, 10, h_hyb, border=1, new_x="LMARGIN", new_y="NEXT", align='C', fill=True)
+
+    def add_row(name, val1, val2):
+        pdf.cell(95, 10, str(name), border=1)
+        pdf.cell(47, 10, f"${int(val1):,}", border=1, align='R')
+        pdf.cell(47, 10, f"${int(val2):,}", border=1, new_x="LMARGIN", new_y="NEXT", align='R')
+
+    # 表格內容
     if use_chinese:
-        pdf.cell(0, 10, "Toyota Corolla Cross TCO 分析報告", ln=True, align='C')
-    else:
-        pdf.cell(0, 10, "Toyota Corolla Cross TCO Report", ln=True, align='C')
+        add_row("車價折舊損失", gas_car_price - gas_resale_final, hybrid_car_price - hybrid_resale_final)
+        add_row("總油錢支出", (total_km / 12.0) * gas_price, (total_km / 21.0) * gas_price)
+        add_row("稅金總額", 11920 * years_to_keep, 11920 * years_to_keep)
+        add_row("大電池風險", 0, battery_risk_cost)
         
+        pdf.cell(95, 12, "【總持有成本 TCO】", border=1)
+        pdf.cell(47, 12, f"${int(tco_gas):,}", border=1, align='R')
+        pdf.cell(47, 12, f"${int(tco_hybrid):,}", border=1, new_x="LMARGIN", new_y="NEXT", align='R')
+    else:
+        add_row("Depreciation", gas_car_price - gas_resale_final, hybrid_car_price - hybrid_resale_final)
+        add_row("Fuel Cost", (total_km / 12.0) * gas_price, (total_km / 21.0) * gas_price)
+        add_row("Tax", 11920 * years_to_keep, 11920 * years_to_keep)
+        add_row("Battery Risk", 0, battery_risk_cost)
+        
+        pdf.cell(95, 12, "Total Cost (TCO)", border=1)
+        pdf.cell(47, 12, f"${int(tco_gas):,}", border=1, align='R')
+        pdf.cell(47, 12, f"${int(tco_hybrid):,}", border=1, new_x="LMARGIN", new_y="NEXT", align='R')
+    
+    pdf.ln(5)
+    
+    # 4. 建議與回本 (對應截圖下方文字)
+    pdf.set_font("TaipeiSans" if use_chinese else "Arial", size=14)
+    if diff > 0:
+        win_text = f"🏆 建議：【油電版】 (省 ${int(diff):,})" if use_chinese else f"Winner: Hybrid (Save ${int(diff):,})"
+        pdf.cell(0, 10, win_text, new_x="LMARGIN", new_y="NEXT")
+    else:
+        win_text = f"🏆 建議：【汽油版】 (省 ${int(abs(diff)):,})" if use_chinese else f"Winner: Gas (Save ${int(abs(diff)):,})"
+        pdf.cell(0, 10, win_text, new_x="LMARGIN", new_y="NEXT")
+
+    if cross_point:
+         cross_text = f"⚡ 回本時間點：{cross_point['標籤']}" if use_chinese else f"Break-even: {cross_point['標籤']}"
+         pdf.cell(0, 10, cross_text, new_x="LMARGIN", new_y="NEXT")
+
     pdf.ln(10)
     
-    # 寫入數據
+    # 5. 災情表 (額外附贈的)
     if use_chinese:
-        pdf.set_font("TaipeiSans", size=12)
-    else:
-        pdf.set_font("Arial", size=12)
-        
-    pdf.cell(0, 10, f"Gas Total Cost: ${int(tco_gas):,}", ln=True)
-    pdf.cell(0, 10, f"Hybrid Total Cost: ${int(tco_hybrid):,}", ln=True)
+        pdf.set_fill_color(255, 240, 240)
+        pdf.cell(0, 10, "⚠️ 重點災情檢查表 (驗車必看)", fill=True, new_x="LMARGIN", new_y="NEXT")
+        pdf.set_font("TaipeiSans", size=11)
+        pdf.ln(3)
+        issues = ["1. 車頂架漏水 (A/C柱水痕)", "2. 避震器過軟 (暈車)", "3. 車機死機/訊號差", "4. 油電電池濾網清潔", "5. 煞車總泵滋滋聲", "6. CVT低速頓挫"]
+        for i in issues: pdf.cell(0, 8, i, new_x="LMARGIN", new_y="NEXT")
     
-    if diff > 0:
-        pdf.cell(0, 10, f"Winner: Hybrid (Save ${int(diff):,})", ln=True)
-    else:
-        pdf.cell(0, 10, f"Winner: Gas (Save ${int(abs(diff)):,})", ln=True)
-
     return bytes(pdf.output())
 
 # --- 顯示網頁 ---
@@ -225,7 +277,7 @@ with st.expander("🚨 機體與系統通病列表 (點擊展開)", expanded=Tru
     """)
 st.markdown("---")
 
-# PDF 下載區 (這版按鈕一定會在)
+# PDF 下載區 (現在一定會顯示，不管字型在不在)
 pdf_bytes = create_pdf()
 if pdf_bytes:
     st.download_button("👉 下載 PDF 報告 (含災情檢查表)", pdf_bytes, "CC_Aero_Report.pdf", "application/pdf")
@@ -243,7 +295,7 @@ with col_a:
     st.caption("🚀 目前已有 **58** 位車友加入候補名單") 
 
 with col_b:
-    # 您的 Google 表單連結 (這版已經修好了)
+    # 您的 Google 表單連結
     google_form_url = "https://forms.gle/MEgRmS1LFbWBNH3T9" 
     
     st.link_button(
@@ -251,6 +303,3 @@ with col_b:
         url=google_form_url, 
         help="手冊上線時，將優先寄送 5 折優惠碼給您！"
     )
-
-st.markdown("---")
-st.caption("Designed by Aerospace Engineer. Data powered by 2026 Auction Reports.")
