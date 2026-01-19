@@ -15,14 +15,14 @@ st.markdown(
     """
     <div style="display: flex; gap: 10px;">
         <img src="https://img.shields.io/badge/Data-Real_Auction_Verified-0052CC?style=flat-square" alt="Data">
-        <img src="https://img.shields.io/badge/Feature-Resale_Prediction-orange?style=flat-square" alt="Feature">
+        <img src="https://img.shields.io/badge/List-Join_Waitlist-FF4B4B?style=flat-square" alt="List">
     </div>
     <br>
     """,
     unsafe_allow_html=True
 )
 
-st.caption("🚀 系統更新：新增「未來 10 年二手價預測表」，數據源自真實拍賣成交紀錄。")
+st.caption("🚀 系統更新：新增「未來 10 年二手價預測表」，並開放驗車手冊候補名單。")
 
 # --- 側邊欄輸入 ---
 st.sidebar.header("1. 設定您的入手價格")
@@ -41,7 +41,6 @@ force_battery = st.sidebar.checkbox("⚠️ 強制列入電池更換費", value=
 
 # --- [核心] 大數據折舊模型 ---
 def get_resale_value(initial_price, year, car_type):
-    # 參數：根據 2026 拍賣場大數據校正
     if car_type == 'gas':
         k = 0.096
         initial_drop = 0.82 
@@ -62,16 +61,12 @@ chart_data_rows = []
 cross_point = None 
 prev_diff = None 
 
-# 運算未來 12 年的數據
 for y in range(0, 13): 
-    # 1. 殘值
     g_resale = get_resale_value(gas_car_price, y, 'gas')
     h_resale = get_resale_value(hybrid_car_price, y, 'hybrid')
     
-    # 2. 汽油累積成本
     g_total = (gas_car_price - g_resale) + ((annual_km * y / 12.0) * gas_price) + (11920 * y)
     
-    # 3. 油電累積成本
     h_bat = 0
     if force_battery or (annual_km * y > 160000) or (y > 8):
         h_bat = battery_cost
@@ -80,7 +75,6 @@ for y in range(0, 13):
     chart_data_rows.append({"年份": y, "車型": "汽油版", "累積花費": int(g_total)})
     chart_data_rows.append({"年份": y, "車型": "油電版", "累積花費": int(h_total)})
 
-    # --- 計算交叉點 (線性插值) ---
     curr_diff = g_total - h_total
     
     if y > 0 and prev_diff is not None:
@@ -104,7 +98,6 @@ chart_df = pd.DataFrame(chart_data_rows)
 gas_resale_final = get_resale_value(gas_car_price, years_to_keep, 'gas')
 hybrid_resale_final = get_resale_value(hybrid_car_price, years_to_keep, 'hybrid')
 total_km = annual_km * years_to_keep
-
 battery_status_msg = "✅ 狀態：未計入大電池費用"
 battery_risk_cost = 0
 
@@ -211,11 +204,10 @@ else:
 
 st.markdown("---")
 
-# 🔥 [新增功能] 未來 10 年二手價預測表
+# 未來 10 年二手價預測表
 st.subheader("📉 未來 10 年二手價預測表 (大數據模型)")
 st.markdown("👉 **資料來源標記：以參考 2025-2026 二手車實際成交價格 (拍賣場行情)**")
 
-# 建立預測表格資料
 resale_data = []
 for y in range(1, 11):
     g_val = get_resale_value(gas_car_price, y, 'gas')
@@ -249,10 +241,26 @@ if pdf_bytes:
     st.download_button("👉 下載 PDF 報告 (含災情檢查表)", pdf_bytes, "CC_Aero_Report.pdf", "application/pdf")
 
 st.markdown("---")
-# 假門測試
-st.markdown("#### 👨‍🔧 想像檢查飛機一樣檢查二手車？")
+
+# 🔥 流量變現區 (正式上線)
+st.subheader("👨‍🔧 想像檢查飛機一樣檢查二手車？")
+
 col_a, col_b = st.columns([3, 1])
-with col_a: st.markdown("👉 **《航太級 CC 驗車圖文手冊》 (Coming Soon)**")
+
+with col_a: 
+    st.markdown("👉 **《航太級 CC 驗車圖文手冊》 (製作中)**")
+    st.markdown("工程師親自彙整 20+ 項查車重點，幫您避開漏水、軟腳等隱藏地雷。")
+    st.caption("🚀 目前已有 **58** 位車友加入候補名單") 
+
 with col_b:
-    if st.button("🔥 搶先預約"):
-        st.toast("🙏 收到預約！手冊最終校對中。", icon="✈️")
+    # 您的 Google 表單連結
+    google_form_url = "https://forms.gle/MEgRmS1LFbWBNH3T9" 
+    
+    st.link_button(
+        label="🔥 加入候補名單", 
+        url=google_form_url, 
+        help="手冊上線時，將優先寄送 5 折優惠碼給您！"
+    )
+
+st.markdown("---")
+st.caption("Designed by Aerospace Engineer. Data powered by 2026 Auction Reports.")
