@@ -1,17 +1,19 @@
-
 import streamlit as st
 import pandas as pd
 import os
+import math
+import altair as alt
 from datetime import datetime
 
 # --- 頁面設定 ---
-st.set_page_config(page_title="CC 購車精算機", page_icon="✈️")
-st.title("✈️ 航太工程師的 CC 購車精算機")
+st.set_page_config(page_title="航太級 TCO 精算機", page_icon="✈️")
+st.title("✈️ 航太工程師的 CC 購車精算機 (V23)")
 
-# --- 初始化狀態 ---
-if 'unlocked' not in st.session_state: st.session_state.unlocked = False
+# --- 初始化 Session State (記憶解鎖狀態) ---
+if 'unlocked' not in st.session_state:
+    st.session_state.unlocked = False
 
-# --- 名單儲存功能 (存成 CSV) ---
+# --- 名單儲存功能 ---
 def save_lead(email):
     file_name = "leads.csv"
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -23,46 +25,107 @@ def save_lead(email):
     with open(file_name, "a", encoding='utf-8') as f:
         f.write(f"{timestamp},{email}\n")
 
-# --- 側邊欄參數 ---
-st.sidebar.header("1. 設定參數")
-gas_price = st.sidebar.number_input("汽油版入手價", value=760000)
-hybrid_price = st.sidebar.number_input("油電版入手價", value=880000)
-km = st.sidebar.slider("年里程 (km)", 5000, 50000, 15000)
-year = st.sidebar.slider("預計持有年分", 1, 15, 10)
+# --- 側邊欄輸入區 ---
+st.sidebar.header("1. 設定您的入手價格")
+gas_car_price = st.sidebar.number_input("⛽ 汽油版 - 入手價", value=760000, step=10000)
+hybrid_car_price = st.sidebar.number_input("⚡ 油電版 - 入手價", value=880000, step=10000)
 
-# --- 簡單計算邏輯 ---
-# 這裡做一個簡單的成本試算，讓首頁有東西可以看
-# 油耗假設: 汽油版 12km/L, 油電版 21km/L, 油價 31元
-gas_fuel_cost = (km * year / 12) * 31
-hybrid_fuel_cost = (km * year / 21) * 31
-tax_diff = 11920 * year # 稅金相同，這裡僅作示意，可依需求調整
+st.sidebar.header("2. 用車習慣")
+annual_km = st.sidebar.slider("每年行駛里程 (km)", 3000, 60000, 15000) 
+years_to_keep = st.sidebar.slider("預計持有幾年", 1, 15, 10)
+gas_price = st.sidebar.number_input("目前油價", value=31.0)
 
-total_gas = gas_price + gas_fuel_cost + tax_diff
-total_hybrid = hybrid_price + hybrid_fuel_cost + tax_diff + 49000 # 加一顆大電池錢
+st.sidebar.header("3. 維修參數")
+battery_cost = st.sidebar.number_input("大電池更換預算", value=49000)
+force_battery = st.sidebar.checkbox("⚠️ 強制列入電池更換費", value=False)
 
-diff = total_gas - total_hybrid
+# --- [核心] 航太級折舊模型 (V23 核心算法) ---
+def get_resale_value(initial_price, year, car_type):
+    # 根據拍賣場大數據擬合的衰退曲線參數
+    if car_type == 'gas':
+        k = 0.096
+        initial_drop = 0.82 
+    else:
+        k = 0.104
+        initial_drop = 0.80 
 
-# --- 顯示試算結果 ---
-st.subheader("📊 初步試算結果")
-col1, col2 = st.columns(2)
-with col1:
-    st.metric("汽油版總花費", f"${int(total_gas):,}")
-with col2:
-    st.metric("油電版總花費", f"${int(total_hybrid):,}")
+    if year == 0: return initial_price * initial_drop
+    elif year == 1: return initial_price * initial_drop
+    else: return (initial_price * initial_drop) * math.exp(-k * (year - 1))
 
-if diff > 0:
-    st.success(f"💡 建議選擇 **油電版**，預計省下 **${int(diff):,}**")
+# --- 計算邏輯 ---
+chart_data_rows = []
+cross_point = None 
+prev_diff = None 
+
+# 模擬未來 13 年的數據
+for y in range(0, 13): 
+    g_resale = get_resale_value(gas_car_price, y, 'gas')
+    h_resale = get_resale_value(hybrid_car_price, y, 'hybrid')
+    
+    # 累積總花費 = (買價 - 殘值) + 油錢 + 稅金
+    g_total = (gas_car_price - g_resale) + ((annual_km * y / 12.0) * gas_price) + (11920 * y)
+    
+    # 油電版多考量電池成本
+    h_bat = battery_cost if (force_battery or (annual_km * y > 160000) or (y > 8)) else 0
+    h_total = (hybrid_car_price - h_resale) + ((annual_km * y / 21.0) * gas_price) + (11920 * y) + h_bat
+
+    chart_data_rows.append({"年份": y, "車型": "汽油版", "累積花費": int(g_total)})
+    chart_data_rows.append({"年份": y, "車型": "油電版", "累積花費": int(h_total)})
+
+    # 計算黃金交叉點
+    curr_diff = g_total - h_total
+    if y > 0 and prev_diff is not None:
+        if prev_diff < 0 and curr_diff >= 0:
+            frac = abs(prev_diff) / (abs(prev_diff) + curr_diff)
+            exact_year = (y - 1) + frac
+            cross_point = {"年份": exact_year, "花費": g_total, "標籤": f"★ 第 {exact_year:.1f} 年回本"}
+    prev_diff = curr_diff
+
+chart_df = pd.DataFrame(chart_data_rows)
+
+# TCO 總結計算
+gas_resale_final = get_resale_value(gas_car_price, years_to_keep, 'gas')
+hybrid_resale_final = get_resale_value(hybrid_car_price, years_to_keep, 'hybrid')
+total_km = annual_km * years_to_keep
+battery_risk_cost = battery_cost if (force_battery or total_km > 160000 or years_to_keep > 8) else 0
+
+tco_gas = (gas_car_price - gas_resale_final) + ((total_km / 12.0) * gas_price) + (11920 * years_to_keep)
+tco_hybrid = (hybrid_car_price - hybrid_resale_final) + ((total_km / 21.0) * gas_price) + (11920 * years_to_keep) + battery_risk_cost
+diff = tco_gas - tco_hybrid
+
+# ================= 顯示層 =================
+
+# 1. 趨勢圖 (免費誘餌)
+st.subheader("📈 成本累積圖 (TCO)")
+st.caption("紅線=汽油，藍線=油電。運用指數衰退模型預測。")
+
+base = alt.Chart(chart_df).encode(
+    x=alt.X('年份', axis=alt.Axis(title='持有年份', tickMinStep=1)),
+    y=alt.Y('累積花費', axis=alt.Axis(title='累積總損失 (NTD)')),
+    color=alt.Color('車型', scale=alt.Scale(domain=['汽油版', '油電版'], range=['#FF4B4B', '#0052CC']))
+)
+lines = base.mark_line(strokeWidth=3)
+
+if cross_point:
+    cross_df = pd.DataFrame([cross_point])
+    points = alt.Chart(cross_df).mark_point(color='red', size=200, filled=True).encode(x='年份', y='花費')
+    # 畫圖
+    st.altair_chart((lines + points).interactive(), use_container_width=True)
+    st.success(f"🎯 **精算結果**：若您打算開超過 **{cross_point['年份']:.1f} 年**，買油電版才划算！")
 else:
-    st.info(f"💡 建議選擇 **汽油版**，預計省下 **${int(abs(diff)):,}**")
+    st.altair_chart(lines.interactive(), use_container_width=True)
+
+col1, col2 = st.columns(2)
+with col1: st.metric("汽油版總花費", f"${int(tco_gas):,}")
+with col2: st.metric("油電版總花費", f"${int(tco_hybrid):,}", delta=f"差額 ${int(diff):,}")
 
 st.markdown("---")
 
-# ==========================================
-# 🎯 核心功能：名單收集器 (自動販賣機)
-# ==========================================
-st.subheader("📉 2026 最新拍賣場成交行情")
+# 2. 鎖碼區 (名單收集器)
+st.subheader("📉 獨家揭露：拍賣場真實成交行情 (413筆)")
 
-# 誘餌預覽表格
+# 預覽表格 (誘餌)
 preview_data = pd.DataFrame([
     {"年份": 2025, "動力": "油電", "成交價": "71.6萬", "備註": "極新車"},
     {"年份": 2024, "動力": "汽油", "成交價": "57.6萬", "備註": "折舊高"},
@@ -71,37 +134,33 @@ preview_data = pd.DataFrame([
 st.table(preview_data)
 
 if not st.session_state.unlocked:
-    # --- 尚未解鎖狀態 ---
-    st.warning("🔒 想查看完整的 400+ 筆真實成交行情？")
-    st.markdown("這份 **Google Sheets 表格** 包含：")
-    st.markdown("👉 **2026 Q1 最新拍賣價**")
-    st.markdown("👉 **預估車行收購成本**")
-    st.markdown("👉 **找代拍能省多少錢**")
+    # --- 鎖定畫面 ---
+    st.warning("🔒 此為 VIP 限定資料")
+    st.markdown("想要查看完整的 **Google Sheets 行情表**？")
+    st.markdown("包含：**2026 Q1 最新拍賣價**、**預估車行收購成本**、**找代拍能省多少錢**")
     
     with st.form("unlock_form"):
-        email_input = st.text_input("請輸入 Email 立即免費查看", placeholder="name@example.com")
-        submit_btn = st.form_submit_button("🔓 立即解鎖", type="primary")
-        
+        email_input = st.text_input("您的 Email", placeholder="example@gmail.com")
+        submit_btn = st.form_submit_button("🔓 解鎖並查看完整報表", type="primary")
         if submit_btn:
             if "@" in email_input:
                 st.session_state.unlocked = True
-                save_lead(email_input) # 自動儲存名單
+                save_lead(email_input)
                 st.rerun()
             else:
-                st.error("請輸入正確的 Email 格式")
-
+                st.error("請輸入有效的 Email 格式")
 else:
-    # --- 已解鎖狀態 ---
-    st.success("✅ 解鎖成功！")
+    # --- 解鎖畫面 (直接連到 Google Sheets) ---
+    st.success("✅ 已解鎖！")
     
     st.markdown("### 👇 點擊下方按鈕，開啟完整行情表：")
     
-    # 您的 Google Sheets 連結已經設定在這裡了
+    # 您的 Google Sheets 連結
     google_sheet_url = "https://docs.google.com/spreadsheets/d/15q0bWKD8PTa01uDZjOQ_fOt5dOTUh0A1D_SrviYP8Lc/edit?gid=0#gid=0"
     
     st.link_button("📊 開啟完整 Google Sheets 行情表", google_sheet_url, type="primary")
     
-    st.caption("建議將表格連結加入書籤，資料會不定期更新。")
+    st.info("💡 建議將表格加入書籤，資料將不定期更新。")
 
 st.markdown("---")
-st.caption("Designed by Aerospace Engineer")
+st.caption("Designed by Aerospace Engineer. Powered by Python & Streamlit.")
