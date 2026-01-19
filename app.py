@@ -48,12 +48,13 @@ def get_resale_value(initial_price, year, car_type):
     elif year == 1: return initial_price * initial_drop
     else: return (initial_price * initial_drop) * math.exp(-k * (year - 1))
 
-# --- 計算邏輯 (自動跟隨 slider 範圍) ---
+# --- 計算邏輯 (V25 精準修正版) ---
 chart_data_rows = []
 cross_point = None 
 prev_diff = None 
+prev_g_total = 0 # 紀錄上一年的花費，用來做內插運算
 
-# 修正：計算範圍動態調整，多算 2 年讓圖表完整
+# 計算範圍動態調整
 calc_range = years_to_keep + 3 
 
 for y in range(0, calc_range): 
@@ -67,16 +68,22 @@ for y in range(0, calc_range):
     chart_data_rows.append({"年份": y, "車型": "汽油版", "累積花費": int(g_total)})
     chart_data_rows.append({"年份": y, "車型": "油電版", "累積花費": int(h_total)})
 
-    # 黃金交叉點計算
+    # 黃金交叉點計算 (使用線性內插法 Linear Interpolation)
     curr_diff = g_total - h_total
     if y > 0 and prev_diff is not None:
-        if prev_diff < 0 and curr_diff >= 0:
+        if prev_diff < 0 and curr_diff >= 0: # 發現交叉 (負轉正)
+            # 算出交叉點在 y-1 到 y 之間的比例 (fraction)
             frac = abs(prev_diff) / (abs(prev_diff) + curr_diff)
             exact_year = (y - 1) + frac
-            # 只顯示在持有年限內的交叉點
+            
+            # 關鍵修正：花費也要依比例計算，不能直接拿年底的 g_total
+            exact_cost = prev_g_total + (g_total - prev_g_total) * frac
+            
             if exact_year <= years_to_keep:
-                cross_point = {"年份": exact_year, "花費": g_total, "標籤": f"★ 第 {exact_year:.1f} 年回本"}
+                cross_point = {"年份": exact_year, "花費": exact_cost, "標籤": f"★ 第 {exact_year:.1f} 年回本"}
+    
     prev_diff = curr_diff
+    prev_g_total = g_total # 更新上一年花費
 
 chart_df = pd.DataFrame(chart_data_rows)
 
@@ -93,7 +100,7 @@ diff = tco_gas - tco_hybrid
 
 # 1. 趨勢圖 (Chart 1)
 st.subheader("📈 成本累積趨勢圖")
-st.caption("紅線=汽油版，藍線=油電版。成本包含：折舊損失 + 油錢 + 稅金。")
+st.caption("紅線=汽油版，藍線=油電版。紅點為精確回本時間點。")
 
 base = alt.Chart(chart_df).encode(
     x=alt.X('年份', axis=alt.Axis(title='持有年份', tickMinStep=1), scale=alt.Scale(domain=[0, years_to_keep + 1])),
@@ -124,10 +131,9 @@ with col2: st.metric("油電版總成本", f"${int(tco_hybrid):,}", delta=f"差�
 
 st.markdown("---")
 
-# 2. 拍賣行情區 (Chart 2 - 文案已修正)
+# 2. 拍賣行情區
 st.subheader("📉 2026 最新拍賣場成交行情 (413筆)")
 
-# 預覽表格 (文案修正：不提代拍)
 preview_data = pd.DataFrame([
     {"年份": 2025, "動力": "油電", "成交價": "71.6萬", "備註": "極新車"},
     {"年份": 2024, "動力": "汽油", "成交價": "57.6萬", "備註": "折舊高"},
@@ -140,7 +146,7 @@ if not st.session_state.unlocked:
     st.markdown("這份 **Google Sheets 行情表** 完整收錄：")
     st.markdown("✅ **2026 Q1 最新拍賣成交價**")
     st.markdown("✅ **車行預估收購成本分析**")
-    st.markdown("✅ **市場行情與價差分析**") # 文案已修正
+    st.markdown("✅ **市場行情與價差分析**")
     
     with st.form("unlock_form"):
         email_input = st.text_input("請輸入 Email 查看完整報表", placeholder="example@gmail.com")
@@ -153,17 +159,14 @@ if not st.session_state.unlocked:
                 st.rerun()
             else:
                 st.error("Email 格式不正確")
-
 else:
     st.success("✅ 已解鎖！")
-    
     st.markdown("### 👇 點擊下方按鈕，開啟完整行情表：")
     
     # 您的 Google Sheets 連結
     google_sheet_url = "https://docs.google.com/spreadsheets/d/15q0bWKD8PTa01uDZjOQ_fOt5dOTUh0A1D_SrviYP8Lc/edit?gid=0#gid=0"
     
     st.link_button("📊 開啟 Google Sheets 行情表", google_sheet_url, type="primary")
-    
     st.info("💡 建議將表格連結加入書籤，資料將不定期更新。")
 
 st.markdown("---")
