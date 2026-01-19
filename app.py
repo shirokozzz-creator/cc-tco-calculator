@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 from fpdf import FPDF
@@ -22,7 +21,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-st.caption("🚀 系統更新：已修復下載按鈕消失問題 (安全模式)。")
+st.caption("🚀 系統狀態：v23.0 穩定版 (含候補名單功能)")
 
 # --- 側邊欄輸入 ---
 st.sidebar.header("1. 設定您的入手價格")
@@ -109,72 +108,57 @@ tco_gas = (gas_car_price - gas_resale_final) + ((total_km / 12.0) * gas_price) +
 tco_hybrid = (hybrid_car_price - hybrid_resale_final) + ((total_km / 21.0) * gas_price) + (11920 * years_to_keep) + battery_risk_cost
 diff = tco_gas - tco_hybrid
 
-# --- PDF 引擎 (安全版) ---
+# --- PDF 引擎 (最簡化穩定版) ---
 def create_pdf():
     pdf = FPDF()
     pdf.add_page()
     
-    # 檢查字型檔 (TaipeiSans.ttf) 是否存在
-    # 如果您有把字型檔放在資料夾裡，請確認檔名是 "TaipeiSans.ttf"
+    # 這裡只做最簡單的檢查，防止崩潰
     font_path = "TaipeiSans.ttf"
+    use_chinese = False
     
-    use_chinese_font = False
     if os.path.exists(font_path):
         try:
             pdf.add_font("TaipeiSans", fname=font_path, uni=True)
             pdf.set_font("TaipeiSans", size=16)
-            use_chinese_font = True
+            use_chinese = True
         except:
-            pass # 如果載入失敗，就退回預設字型
+            pass # 載入失敗就放棄
 
-    if not use_chinese_font:
-        # 如果找不到字型，使用 Arial (避免按鈕消失，但中文會變亂碼)
-        pdf.set_font("Arial", size=16)
-        st.toast("⚠️ 警告：找不到 TaipeiSans.ttf，PDF 中文將顯示為亂碼。", icon="🔤")
+    if not use_chinese:
+        # 如果沒字型，就用預設的，雖然中文會亂碼，但至少按鈕會在
+        pdf.set_font("Arial", size=14)
+        st.toast("⚠️ 系統提示：找不到 TaipeiSans.ttf，PDF 中文可能無法顯示。", icon="ℹ️")
 
-    # 封面設計
-    pdf.set_fill_color(0, 51, 102) # 深藍
-    pdf.rect(0, 0, 210, 40, 'F')
-    
-    if use_chinese_font:
-        pdf.set_text_color(255, 255, 255)
-        pdf.set_xy(10, 15)
-        pdf.cell(0, 10, "✈️ 航太工程師嚴選 (Aerospace Certified)", ln=True)
-
-        pdf.ln(30)
-        pdf.set_text_color(0, 0, 0)
-        pdf.set_font("TaipeiSans", size=24)
-        pdf.cell(0, 15, "Toyota Corolla Cross", ln=True, align='C')
-        pdf.set_font("TaipeiSans", size=20)
-        pdf.set_text_color(0, 51, 102)
-        pdf.cell(0, 15, "全方位持有成本分析報告", ln=True, align='C')
+    # 寫入標題 (如果沒中文字型，這裡會是亂碼，但檔案可下載)
+    if use_chinese:
+        pdf.cell(0, 10, "Toyota Corolla Cross TCO 分析報告", ln=True, align='C')
     else:
-        # 英文 fallback，確保至少有東西看
-        pdf.set_text_color(255, 255, 255)
-        pdf.set_xy(10, 15)
-        pdf.cell(0, 10, "Aerospace Certified Report", ln=True)
-        pdf.ln(30)
-        pdf.set_text_color(0, 0, 0)
-        pdf.cell(0, 15, "Toyota Corolla Cross TCO Report", ln=True, align='C')
-
-    # ... (中間數據部分，若無字型會亂碼，但程式不會崩潰) ...
+        pdf.cell(0, 10, "Toyota Corolla Cross TCO Report", ln=True, align='C')
+        
     pdf.ln(10)
-    pdf.set_text_color(0, 0, 0)
-    if use_chinese_font:
+    
+    # 寫入數據
+    if use_chinese:
         pdf.set_font("TaipeiSans", size=12)
     else:
         pdf.set_font("Arial", size=12)
-
-    # 簡單列印數據
-    pdf.cell(0, 10, f"Gas TCO: ${int(tco_gas):,}", ln=True)
-    pdf.cell(0, 10, f"Hybrid TCO: ${int(tco_hybrid):,}", ln=True)
+        
+    pdf.cell(0, 10, f"Gas Total Cost: ${int(tco_gas):,}", ln=True)
+    pdf.cell(0, 10, f"Hybrid Total Cost: ${int(tco_hybrid):,}", ln=True)
     
+    if diff > 0:
+        pdf.cell(0, 10, f"Winner: Hybrid (Save ${int(diff):,})", ln=True)
+    else:
+        pdf.cell(0, 10, f"Winner: Gas (Save ${int(abs(diff)):,})", ln=True)
+
     return bytes(pdf.output())
 
 # --- 顯示網頁 ---
 st.subheader("📈 成本累積圖 (含黃金交叉標記)")
 st.caption("紅線=汽油，藍線=油電。系統已自動計算精確的回本時間。")
 
+# Altair 雙線圖
 base = alt.Chart(chart_df).encode(
     x=alt.X('年份', axis=alt.Axis(title='持有年份', tickMinStep=1)),
     y=alt.Y('累積花費', axis=alt.Axis(title='累積總損失 (NTD)')),
@@ -203,6 +187,11 @@ col1, col2 = st.columns(2)
 with col1: st.metric("汽油版總花費", f"${int(tco_gas):,}")
 with col2: st.metric("油電版總花費", f"${int(tco_hybrid):,}", delta=f"差額 ${int(diff):,}")
 
+if battery_risk_cost > 0:
+    st.info(f"💡 提醒：目前的藍線**已包含**大電池更換成本 (${int(battery_cost):,})。")
+else:
+    st.info("💡 提醒：目前的藍線**尚未**計入大電池成本 (里程/年份未達標)。")
+
 st.markdown("---")
 
 # 未來 10 年二手價預測表
@@ -222,28 +211,30 @@ for y in range(1, 11):
 
 resale_df = pd.DataFrame(resale_data)
 st.dataframe(resale_df, use_container_width=True)
+st.caption("註：此價格為預估車行收購/拍賣行情，實際價格視車況與市場波動而定。")
 
 st.markdown("---")
 # 災情表
 st.subheader("🔍 航太工程師的災情資料庫")
 with st.expander("🚨 機體與系統通病列表 (點擊展開)", expanded=True):
     st.markdown("""
-    - **💦 機體結構 (漏水)**：20-21年式車頂架防水墊片瑕疵。
-    - **🤢 懸吊系統 (軟腳)**：原廠設定舒適取向，導致動態不穩。
-    - **🖥️ 航電系統 (車機)**：原廠 Drive+ Connect 穩定度不足。
+    - **💦 機體結構 (漏水)**：20-21年式車頂架防水墊片瑕疵，**風險等級：高**。
+    - **🤢 懸吊系統 (軟腳)**：原廠設定舒適取向，導致動態不穩，**建議方案：更換改裝避震**。
+    - **🖥️ 航電系統 (車機)**：原廠 Drive+ Connect 穩定度不足，**建議方案：改裝安卓機**。
+    - **⚡ 動力系統 (散熱)**：油電版大電池濾網需定期清潔，避免高溫導致壽命縮短。
     """)
-
 st.markdown("---")
 
-# PDF 下載區 (現在一定會顯示，不管字型在不在)
+# PDF 下載區 (這版按鈕一定會在)
 pdf_bytes = create_pdf()
 if pdf_bytes:
     st.download_button("👉 下載 PDF 報告 (含災情檢查表)", pdf_bytes, "CC_Aero_Report.pdf", "application/pdf")
 
 st.markdown("---")
 
-# 🔥 流量變現區
+# 🔥 流量變現區 (名單收集)
 st.subheader("👨‍🔧 想像檢查飛機一樣檢查二手車？")
+
 col_a, col_b = st.columns([3, 1])
 
 with col_a: 
@@ -252,10 +243,14 @@ with col_a:
     st.caption("🚀 目前已有 **58** 位車友加入候補名單") 
 
 with col_b:
-    # 這裡已經幫您放好剛剛的表單連結了
+    # 您的 Google 表單連結 (這版已經修好了)
     google_form_url = "https://forms.gle/MEgRmS1LFbWBNH3T9" 
+    
     st.link_button(
         label="🔥 加入候補名單", 
         url=google_form_url, 
         help="手冊上線時，將優先寄送 5 折優惠碼給您！"
     )
+
+st.markdown("---")
+st.caption("Designed by Aerospace Engineer. Data powered by 2026 Auction Reports.")
