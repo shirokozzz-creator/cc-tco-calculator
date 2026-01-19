@@ -172,4 +172,63 @@ points = base.mark_point(filled=True, size=100).encode(
 # 繪製選取時的文字標籤
 text = base.mark_text(align='left', dx=5, dy=-5).encode(
     text=alt.condition(nearest, '累積花費', alt.value(' ')),
-    opacity=alt.condition(nearest, alt.value(
+    opacity=alt.condition(nearest, alt.value(1), alt.value(0))
+)
+
+# 繪製選取時的垂直輔助線
+rules = alt.Chart(chart_df).mark_rule(color='gray').encode(
+    x='年份',
+).transform_filter(
+    nearest
+)
+
+# 黃金交叉點 (紅點)
+if cross_point:
+    cross_df = pd.DataFrame([cross_point])
+    cross_layer = alt.Chart(cross_df).mark_point(color='red', size=300, shape='diamond', filled=True).encode(
+        x='年份', y='花費', tooltip=['年份', '花費']
+    )
+    final_chart = (lines + selectors + points + rules + text + cross_layer).interactive()
+    
+    st.altair_chart(final_chart, use_container_width=True)
+    st.write(f"📍 **黃金交叉點**：第 **{cross_point['年份']:.1f} 年**")
+else:
+    st.altair_chart((lines + selectors + points + rules + text).interactive(), use_container_width=True)
+
+st.markdown("---")
+
+# 3. 拍賣行情區
+st.subheader("📉 2026 最新拍賣場成交行情 (413筆)")
+preview_data = pd.DataFrame([
+    {"年份": 2025, "動力": "油電", "成交價": "71.6萬", "備註": "極新車"},
+    {"年份": 2024, "動力": "汽油", "成交價": "57.6萬", "備註": "折舊高"},
+    {"年份": "...", "動力": "...", "成交價": "🔒", "備註": "VIP限定"},
+])
+st.table(preview_data)
+
+if not st.session_state.unlocked:
+    st.warning("🔒 這是 VIP 限定資料")
+    st.markdown("這份 **Google Sheets 行情表** 完整收錄：")
+    st.markdown("✅ **2026 Q1 最新拍賣成交價**")
+    st.markdown("✅ **車行預估收購成本分析**")
+    st.markdown("✅ **市場行情與價差分析**")
+    
+    with st.form("unlock_form"):
+        email_input = st.text_input("請輸入 Email 查看完整報表", placeholder="example@gmail.com")
+        submit_btn = st.form_submit_button("🔓 解鎖", type="primary")
+        if submit_btn:
+            if "@" in email_input:
+                st.session_state.unlocked = True
+                save_lead(email_input)
+                st.rerun()
+            else:
+                st.error("Email 格式不正確")
+else:
+    st.success("✅ 已解鎖！")
+    st.markdown("### 👇 點擊下方按鈕，開啟完整行情表：")
+    google_sheet_url = "https://docs.google.com/spreadsheets/d/15q0bWKD8PTa01uDZjOQ_fOt5dOTUh0A1D_SrviYP8Lc/edit?gid=0#gid=0"
+    st.link_button("📊 開啟 Google Sheets 行情表", google_sheet_url, type="primary")
+    st.info("💡 建議將表格連結加入書籤，資料將不定期更新。")
+
+st.markdown("---")
+st.caption("Designed by Aerospace Engineer. Powered by Python.")
