@@ -21,7 +21,18 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-st.caption("🚀 系統狀態：已還原至「經典表格版」PDF 報告。")
+st.caption("🚀 系統狀態：v25.1 側邊欄優化版 (提升填單率)")
+
+# ==========================================
+# 🔥 [新功能] 側邊欄強力推廣區 (位置在最上方)
+# ==========================================
+st.sidebar.markdown("### 🚨 怕買到檸檬車？")
+st.sidebar.info("工程師整理了 **20+ 項通病檢查表** (漏水/變速箱/電池)，看車時一項一項對，避免踩雷！")
+# 您的 Google 表單連結
+google_form_url = "https://forms.gle/MEgRmS1LFbWBNH3T9"
+st.sidebar.link_button("👉 免費索取檢查手冊", google_form_url, type="primary") # type="primary" 會讓按鈕變紅色，更顯眼
+st.sidebar.markdown("---")
+# ==========================================
 
 # --- 側邊欄輸入 ---
 st.sidebar.header("1. 設定您的入手價格")
@@ -108,7 +119,7 @@ tco_gas = (gas_car_price - gas_resale_final) + ((total_km / 12.0) * gas_price) +
 tco_hybrid = (hybrid_car_price - hybrid_resale_final) + ((total_km / 21.0) * gas_price) + (11920 * years_to_keep) + battery_risk_cost
 diff = tco_gas - tco_hybrid
 
-# --- PDF 引擎 (經典表格版 - 對應您的截圖) ---
+# --- PDF 引擎 (經典穩定版) ---
 def create_pdf():
     pdf = FPDF()
     pdf.add_page()
@@ -129,20 +140,20 @@ def create_pdf():
         pdf.set_font("Arial", size=16)
         st.toast("⚠️ 提示：缺少 TaipeiSans.ttf，PDF 將顯示為英文。", icon="ℹ️")
 
-    # 1. 標題 (對應截圖上方)
+    # 1. 標題
     title_text = "Toyota Corolla Cross TCO 分析報告" if use_chinese else "Toyota Corolla Cross TCO Report"
     pdf.cell(0, 10, title_text, new_x="LMARGIN", new_y="NEXT", align='C')
     
     pdf.ln(5)
     
-    # 2. 參數 (對應截圖副標題)
+    # 2. 參數
     pdf.set_font("TaipeiSans" if use_chinese else "Arial", size=10)
     param_text = f"參數：持有 {years_to_keep} 年 / 每年 {annual_km:,} km" if use_chinese else f"Params: {years_to_keep} Years / {annual_km:,} km/yr"
     pdf.cell(0, 10, param_text, new_x="LMARGIN", new_y="NEXT", align='C')
     
-    # 3. 表格 (對應截圖中間的大表格)
+    # 3. 表格
     pdf.set_font("TaipeiSans" if use_chinese else "Arial", size=12)
-    pdf.set_fill_color(240, 240, 240) # 灰色底
+    pdf.set_fill_color(240, 240, 240)
     
     # 表頭
     h_item = "項目" if use_chinese else "Item"
@@ -180,7 +191,7 @@ def create_pdf():
     
     pdf.ln(5)
     
-    # 4. 建議與回本 (對應截圖下方文字)
+    # 4. 建議與回本
     pdf.set_font("TaipeiSans" if use_chinese else "Arial", size=14)
     if diff > 0:
         win_text = f"🏆 建議：【油電版】 (省 ${int(diff):,})" if use_chinese else f"Winner: Hybrid (Save ${int(diff):,})"
@@ -195,7 +206,7 @@ def create_pdf():
 
     pdf.ln(10)
     
-    # 5. 災情表 (額外附贈的)
+    # 5. 災情表
     if use_chinese:
         pdf.set_fill_color(255, 240, 240)
         pdf.cell(0, 10, "⚠️ 重點災情檢查表 (驗車必看)", fill=True, new_x="LMARGIN", new_y="NEXT")
@@ -284,22 +295,5 @@ if pdf_bytes:
 
 st.markdown("---")
 
-# 🔥 流量變現區 (名單收集)
-st.subheader("👨‍🔧 想像檢查飛機一樣檢查二手車？")
-
-col_a, col_b = st.columns([3, 1])
-
-with col_a: 
-    st.markdown("👉 **《航太級 CC 驗車圖文手冊》 (製作中)**")
-    st.markdown("工程師親自彙整 20+ 項查車重點，幫您避開漏水、軟腳等隱藏地雷。")
-    st.caption("🚀 目前已有 **58** 位車友加入候補名單") 
-
-with col_b:
-    # 您的 Google 表單連結
-    google_form_url = "https://forms.gle/MEgRmS1LFbWBNH3T9" 
-    
-    st.link_button(
-        label="🔥 加入候補名單", 
-        url=google_form_url, 
-        help="手冊上線時，將優先寄送 5 折優惠碼給您！"
-    )
+# 底部版權
+st.caption("Designed by Aerospace Engineer. Data powered by 2026 Auction Reports.")
