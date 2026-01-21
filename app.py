@@ -226,6 +226,8 @@ st.table(preview_df)
 
 if not st.session_state.unlocked:
     st.warning(f"🔒 想知道 {selected_model} 的真實底價？")
+    
+    # 這裡顯示您最新的「購車指南」文案
     st.markdown(f"""
     這份 **{selected_model} 獨家行情表** 包含：
     1. 📉 **歷年真實成交價** (別被網路開價騙了)
@@ -234,23 +236,36 @@ if not st.session_state.unlocked:
     """)
     
     with st.form("lead_form"):
-        email = st.text_input("輸入 Email 解鎖完整行情", placeholder="name@example.com")
+        email = st.text_input("輸入 Email 索取完整報告", placeholder="name@example.com")
         if st.form_submit_button("🔓 立即解鎖", type="primary"):
             if "@" in email:
                 save_lead(email, selected_model)
                 st.session_state.unlocked = True
+                st.session_state.user_email = email # 把 Email 暫存起來，等一下顯示用
                 st.rerun()
             else:
                 st.error("Email 格式錯誤")
 else:
-    st.success("✅ 解鎖成功！")
+    # === 這裏是客戶送出資料後看到的畫面 ===
+    st.success("✅ 申請成功！")
     
-    # === 維護模式：隱藏連結，顯示公告 ===
-    # 這是您現在要的狀態，收集名單但不給表
-    st.markdown(f"### 🚧 {selected_model} 資料庫校正中...")
-    st.info("👨‍💻 **航太工程師公告：**\n\n目前 2026 Q1 的成交數據正在進行最終參數校正（為了確保數據精準度）。\n\n系統已記錄您的需求，一旦資料庫更新完成，我會第一時間將完整報表寄到您的 Email！")
+    # 抓取客戶剛剛輸入的 Email
+    user_mail = st.session_state.get('user_email', '您的信箱')
     
-    # 若未來要開放，請把下面這行前面的 # 拿掉，並把上面的公告加 # 註解掉
-    # st.link_button("📊 開啟 Google Sheets", params["sheet_url"], type="primary")
+    st.markdown(f"### 📨 報告已列入發送排程")
+    
+    st.info(f"""
+    **感謝您的信任。**
+    
+    為了確保數據的精準度，**航太工程師 Brian** 將會親自整理一份
+    **【{selected_model} 2026 Q1 獨家行情 + 避坑指南】**。
+    
+    報告將會在稍後直接寄送到您的 E-mail：
+    👉 **{user_mail}**
+    
+    *(這通常需要一點時間，請留意收件匣或垃圾郵件)*
+    """)
+    
+    st.caption("我們承諾保護您的隱私，絕不發送垃圾信件。")
 
 st.caption("Designed by Aerospace Engineer.")
