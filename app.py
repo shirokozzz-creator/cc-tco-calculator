@@ -226,7 +226,12 @@ st.table(preview_df)
 
 if not st.session_state.unlocked:
     st.warning(f"🔒 想知道 {selected_model} 的真實底價？")
-    st.markdown(f"這份 **{selected_model} 獨家行情表** 包含真實成交價、車商利潤分析。")
+    st.markdown(f"""
+    這份 **{selected_model} 獨家行情表** 包含：
+    1. 📉 **歷年真實成交價** (別被網路開價騙了)
+    2. 🚫 **工程師避坑指南** (年份通病、稅金陷阱、高里程地雷)
+    3. ✅ **魔人點評** (教你挑出 CP 值最高的年份)
+    """)
     
     with st.form("lead_form"):
         email = st.text_input("輸入 Email 解鎖完整行情", placeholder="name@example.com")
