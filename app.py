@@ -11,11 +11,12 @@ st.set_page_config(page_title="Toyota 全車系 TCO 精算機", page_icon="🚗"
 # ==========================================
 # 🧠 數據中樞 (三台車的預設參數)
 # ==========================================
+# 未來您要把 Google Sheets 連結填入這裡
 car_db = {
     "Corolla Cross": {
         "gas_price": 760000, "hybrid_price": 880000, "battery": 49000,
-        "advice_gas": "適合年跑1萬公里以下，首選 2021 豪華版，CP值最高。",
-        "advice_hybrid": "適合通勤族，首選 2022 年式，避開高里程營業車。",
+        "advice_gas": "適合年跑1萬公里以下，首選 2024 汽油版，租賃退役CP值最高。",
+        "advice_hybrid": "適合通勤族，首選 2022 年式，低於 45 萬通常是營業車。",
         "sheet_url": "https://docs.google.com/spreadsheets/d/您的CC表格連結/edit"
     },
     "RAV4": {
@@ -39,9 +40,11 @@ if 'unlocked' not in st.session_state: st.session_state.unlocked = False
 def save_lead(email, model):
     file_name = "leads.csv"
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    # 如果檔案不存在，先建立標題列
     if not os.path.exists(file_name):
         with open(file_name, "w", encoding='utf-8') as f:
             f.write("Time,Model,Email\n")
+    # 寫入資料
     with open(file_name, "a", encoding='utf-8') as f:
         f.write(f"{timestamp},{model},{email}\n")
 
@@ -49,25 +52,25 @@ def save_lead(email, model):
 with st.sidebar:
     st.title("⚙️ 參數設定")
     
-    # 車型選擇
+    # 1. 車型選擇
     selected_model = st.selectbox("請選擇車款", ["Corolla Cross", "RAV4", "Altis"])
     params = car_db[selected_model]
     
     st.markdown("---")
-    # 價格設定 (隨車型變動)
+    # 2. 價格設定 (隨車型變動)
     gas_car_price = st.number_input("⛽ 汽油版 - 入手價", value=params["gas_price"], step=10000)
     hybrid_car_price = st.number_input("⚡ 油電版 - 入手價", value=params["hybrid_price"], step=10000)
     
-    # 習慣設定
+    # 3. 習慣設定
     annual_km = st.slider("年行駛里程 (km)", 5000, 60000, 15000) 
     years_to_keep = st.slider("預計持有年分", 1, 15, 10)
     gas_price = st.number_input("目前油價", value=31.0)
     
-    # 電池設定
+    # 4. 電池設定
     battery_cost = st.number_input("大電池更換預算", value=params["battery"])
     force_battery = st.checkbox("⚠️ 強制列入電池成本", value=False)
     
-    # 🕵️‍♂️ 管理員後台 (密碼 1234)
+    # 5. 🕵️‍♂️ 管理員後台 (密碼 1234)
     with st.expander("🕵️‍♂️ 管理員專區"):
         if st.text_input("密碼", type="password") == "1234":
             if os.path.exists("leads.csv"):
@@ -78,12 +81,12 @@ with st.sidebar:
                 st.info("暫無名單")
 
 # --- 主畫面標題 ---
-st.title(f"✈️ 航太工程師的 {selected_model} 購車精算機 (V30)")
-st.caption("運用航太級 TCO 模型，幫您算出符合數學邏輯的最佳選擇。")
-# --- 主畫面標題 ---
-st.title(f"✈️ 航太工程師的 {selected_model} 購車精算機 (V30)")
+st.title(f"✈️ 航太工程師的 {selected_model} 購車精算機")
 st.caption("運用航太級 TCO 模型，幫您算出符合數學邏輯的最佳選擇。")
 
+# ==========================================
+# 📘 TCO 定義區塊 (冰山理論)
+# ==========================================
 with st.expander("❓ 什麼是 TCO？為什麼工程師買車都看這個？"):
     st.markdown("""
     ### 🚗 買車就像一座冰山，您只看到了水面上的「車價」...
@@ -100,14 +103,11 @@ with st.expander("❓ 什麼是 TCO？為什麼工程師買車都看這個？"):
     > **💡 數據魔人的結論：**
     > 不要只看現在花多少錢買車，要看未來幾年您**總共會花掉多少錢**。
     """)
-    
 st.markdown("---")
-
-# --- 核心運算邏輯 (這行原本就有，不用動，只是讓您確認位置) ---
-def get_resale_value(initial_price, year, car_type):
 
 # --- 核心運算邏輯 ---
 def get_resale_value(initial_price, year, car_type):
+    # 簡單模擬折舊模型
     k = 0.096 if car_type == 'gas' else 0.104
     initial_drop = 0.82 if car_type == 'gas' else 0.80 
     if year <= 1: return initial_price * initial_drop
@@ -134,7 +134,7 @@ for y in range(0, calc_range):
     chart_data_rows.append({"年份": y, "車型": "汽油版", "累積花費": int(g_total)})
     chart_data_rows.append({"年份": y, "車型": "油電版", "累積花費": int(h_total)})
 
-    # 黃金交叉點 (內插法)
+    # 黃金交叉點計算
     curr_diff = g_total - h_total
     if y > 0 and prev_diff is not None:
         if prev_diff < 0 and curr_diff >= 0:
@@ -147,7 +147,7 @@ for y in range(0, calc_range):
 
 chart_df = pd.DataFrame(chart_data_rows)
 
-# TCO 總結
+# TCO 總結計算
 total_km = annual_km * years_to_keep
 is_battery_included = (force_battery or total_km > 160000 or years_to_keep > 8)
 battery_risk_cost = battery_cost if is_battery_included else 0
@@ -216,6 +216,7 @@ else:
 st.markdown("---")
 st.subheader(f"📉 {selected_model} 真實拍賣成交行情")
 
+# 假資料預覽
 preview_df = pd.DataFrame([
     {"年份": 2024, "車型": selected_model, "成交價": "🔒 VIP限定", "備註": "需解鎖"},
     {"年份": 2023, "車型": selected_model, "成交價": "🔒 VIP限定", "備註": "需解鎖"},
@@ -240,10 +241,11 @@ else:
     st.success("✅ 解鎖成功！")
     
     # === 維護模式：隱藏連結，顯示公告 ===
+    # 這是您現在要的狀態，收集名單但不給表
     st.markdown(f"### 🚧 {selected_model} 資料庫校正中...")
     st.info("👨‍💻 **航太工程師公告：**\n\n目前 2026 Q1 的成交數據正在進行最終參數校正（為了確保數據精準度）。\n\n系統已記錄您的需求，一旦資料庫更新完成，我會第一時間將完整報表寄到您的 Email！")
     
-    # 若要重新開放，請把下面這行前面的 # 拿掉，並把上面的公告註解掉
+    # 若未來要開放，請把下面這行前面的 # 拿掉，並把上面的公告加 # 註解掉
     # st.link_button("📊 開啟 Google Sheets", params["sheet_url"], type="primary")
 
 st.caption("Designed by Aerospace Engineer.")
