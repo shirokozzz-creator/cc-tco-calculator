@@ -65,7 +65,29 @@ def page_toyota_tco():
     gas_price = st.sidebar.number_input("目前油價", value=31.0)
     battery_cost = st.sidebar.number_input("大電池更換預算", value=params["battery"])
     force_battery = st.sidebar.checkbox("⚠️ 強制列入電池成本", value=False)
-
+# --- 補回管理員後台 ---
+    st.sidebar.markdown("---")
+    with st.sidebar.expander("🕵️‍♂️ 管理員後台 (查名單)"):
+        admin_pwd = st.text_input("輸入密碼", type="password", key="admin_check")
+        if admin_pwd == "uc0088":  
+            if os.path.exists("leads.csv"):
+                # 讀取並顯示名單
+                df_leads = pd.read_csv("leads.csv")
+                st.write(f"目前累積：{len(df_leads)} 筆")
+                st.dataframe(df_leads)
+                
+                # 下載按鈕
+                csv = df_leads.to_csv(index=False).encode('utf-8-sig')
+                st.download_button(
+                    "📥 下載 CSV 檔案",
+                    csv,
+                    "leads.csv",
+                    "text/csv",
+                    key='download-csv'
+                )
+            else:
+                st.warning("📂 資料庫目前是空的 (還沒人填寫)")
+            
     # --- 主畫面 ---
     st.title(f"✈️ 航太工程師的 {selected_model} 購車精算機")
     st.caption("運用航太級 TCO 模型，幫您算出符合數學邏輯的最佳選擇。")
