@@ -70,9 +70,9 @@ with st.sidebar:
     battery_cost = st.number_input("大電池更換預算", value=params["battery"])
     force_battery = st.checkbox("⚠️ 強制列入電池成本", value=False)
     
-    # 5. 🕵️‍♂️ 管理員後台 (密碼 1234)
+    # 5. 🕵️‍♂️ 管理員後台 (密碼 uc0088)
     with st.expander("🕵️‍♂️ 管理員專區"):
-        if st.text_input("密碼", type="password") == "1234":
+        if st.text_input("密碼", type="password") == "uc0088":
             if os.path.exists("leads.csv"):
                 df_leads = pd.read_csv("leads.csv")
                 st.dataframe(df_leads)
