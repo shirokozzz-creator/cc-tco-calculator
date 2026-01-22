@@ -293,7 +293,7 @@ def main():
         st.title("🔒 內部研發中")
         password = st.sidebar.text_input("🔑 請輸入權限金鑰", type="password")
         
-        if password == "brian888":  # 您的密碼
+        if password == "uc0088":  # 您的密碼
             st.sidebar.success("身份驗證成功")
             page_es300h_private()
         else:
