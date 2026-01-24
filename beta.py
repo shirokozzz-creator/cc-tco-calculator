@@ -187,10 +187,10 @@ def main():
     
     st.altair_chart(chart, use_container_width=True)
 
-    # --- 5. 詳細數據與工程師震撼分析 ---
-    with st.expander("🕵️‍♂️ 查看工程師的「殘酷真相」分析"):
+# --- 5. 詳細數據與工程師震撼分析 (斬殺版) ---
+    with st.expander("💀 點擊查看：工程師的「殘酷真相」報告 (心臟不好勿入)", expanded=True):
         
-        # === 這裡插入了「工程師的絕對領域分析」 ===
+        # === Part 1: 具象化分析 (繞台灣、iPhone) ===
         
         # 計算差額參數 (6代新車 vs 5.5代汽油)
         saved_price = competitors[0]['price'] - competitors[2]['price'] 
@@ -200,14 +200,14 @@ def main():
         # 稅金差異 (2.5L vs 2.0L)
         tax_waste = (22410 - 17410) * years 
         iphone_count = int(tax_waste / 30000) 
-        
-        st.markdown("#### ⚡ 工程師的「絕對領域」分析")
+
+        st.markdown("#### ⚡ 階段一：絕對領域分析")
         k1, k2, k3 = st.columns(3)
         
         with k1:
             st.info("⛽ **省下的車價能跑多遠？**")
             st.markdown(f"""
-            買 5.5 代汽油版省下的 **${saved_price:,}** 價差，
+            買 5.5 代汽油版省下的 **${saved_price:,}**，
             夠你加 **{int(gas_amount):,} 公升** 的油。
             相當於可以 **免費繞台灣 {int(round_taiwan)} 圈**！
             """)
@@ -215,40 +215,77 @@ def main():
         with k2:
             st.warning("💸 **稅金陷阱 (2.5L vs 2.0L)**")
             st.markdown(f"""
-            若買 6 代或油電版，持有 {years} 年下來，
+            若買 6 代，持有 {years} 年下來，
             你將多繳 **${tax_waste:,}** 給政府。
             這筆錢等於 **平白扔掉了 {iphone_count} 支 iPhone**。
             """)
 
         with k3:
-            st.success("📉 **真正的黃金交叉**")
+            st.success("📉 **回本難度係數**")
             # 簡單估算回本里程
-            # 每公里油錢成本差異 = (汽油車每公里油錢) - (6代新車每公里油錢)
             cost_per_km_gas = gas_price / competitors[2]['km_l']
             cost_per_km_new = gas_price / competitors[0]['km_l']
             km_diff_cost = cost_per_km_gas - cost_per_km_new
             
             if km_diff_cost > 0:
-                # 需追回的總成本 = 車價差 + 稅金差
                 total_gap_to_cover = saved_price + tax_waste
                 break_even_km = total_gap_to_cover / km_diff_cost
-                
                 years_to_break_even = break_even_km / km_per_year if km_per_year > 0 else 99
                 
                 if years_to_break_even < 50:
                     st.markdown(f"""
                     想靠 6 代油電「省油」把車價賺回來？
-                    數學告訴我，你必須開 **{int(break_even_km):,} 公里**。
-                    以你現在的里程，要開 **{years_to_break_even:.1f} 年** 才能回本。
+                    你必須開 **{int(break_even_km):,} 公里**。
+                    以目前里程，要 **{years_to_break_even:.1f} 年** 才能回本。
                     """)
                 else:
                      st.markdown("由於車價與稅金差距過大，**這輩子靠省油都賺不回成本**。")
             else:
-                 st.markdown("油價或油耗數據異常，無法計算交叉點。")
+                 st.markdown("無法計算交叉點。")
+
+        # === Part 2: 斬殺線 (Kill Zone) ===
+        st.markdown("---")
+        st.subheader("🩸 階段二：Brian 的斬殺線 (Kill Zone)")
+        st.caption("工程師如果不算這筆帳，你可能永遠不知道自己損失了什麼。")
+        
+        # 計算斬殺參數
+        # 假設月薪 8 萬 (工程師平均) -> 日薪約 3,600 (以22工作天計)
+        monthly_salary = 80000
+        daily_salary = monthly_salary / 22
+        work_months = saved_price / monthly_salary
+        work_days = saved_price / daily_salary
+        
+        # 投資複利損失 (10年, 6%年化)
+        future_value = saved_price * (1.06 ** years)
+        lost_wealth = future_value - saved_price
+        
+        kz1, kz2 = st.columns(2)
+        
+        with kz1:
+            st.error(f"⚰️ **生命能量消耗**")
+            st.markdown(f"""
+            為了這台 6 代新車，你多花的錢相當於：
+            **你必須不吃不喝工作 {work_months:.1f} 個月**。
+            
+            也就是說，你接下來的 **{int(work_days)} 個工作天**，
+            每天早起、加班、被老闆罵，**全部都是在做白工**。
+            你確定要用半年的生命，去換一台車的折舊嗎？
+            """)
+            
+        with kz2:
+            st.error(f"📉 **財富自由阻礙**")
+            st.markdown(f"""
+            如果把省下的 **${saved_price:,}** 拿去買 0050 (假設年化 6%)：
+            {years} 年後，這筆錢會滾成 **${int(future_value):,}**。
+            
+            選錯車的代價，不只是現在多付錢，
+            而是讓你 **{years} 年後憑空蒸發了 ${int(lost_wealth):,} 的獲利**。
+            這是你在為自己的退休金自殺。
+            """)
 
         st.markdown("---")
-        st.markdown("#### 📊 原始運算數據表")
-        st.dataframe(df_chart)
+        with st.expander("查看原始數據表"):
+            st.dataframe(df_chart)
 
 if __name__ == "__main__":
     main()
