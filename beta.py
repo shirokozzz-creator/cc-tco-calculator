@@ -144,8 +144,8 @@ def main():
     
     # 計算數據
     winner_name = min(final_results, key=final_results.get)
-    loser_name = max(final_results.values())
-    winner_val = final_results[winner_name]
+    # loser_name = max(final_results.values()) # 暫時不用
+    # winner_val = final_results[winner_name] # 暫時不用
     gap = max(final_results.values()) - min(final_results.values())
     
     # 顯示三個 Metric (與價格連動)
@@ -187,8 +187,67 @@ def main():
     
     st.altair_chart(chart, use_container_width=True)
 
-    # --- 5. 除錯與名單 ---
-    with st.expander("🕵️‍♂️ 查看詳細數據表"):
+    # --- 5. 詳細數據與工程師震撼分析 ---
+    with st.expander("🕵️‍♂️ 查看工程師的「殘酷真相」分析"):
+        
+        # === 這裡插入了「工程師的絕對領域分析」 ===
+        
+        # 計算差額參數 (6代新車 vs 5.5代汽油)
+        saved_price = competitors[0]['price'] - competitors[2]['price'] 
+        gas_amount = saved_price / gas_price if gas_price > 0 else 0
+        round_taiwan = gas_amount * competitors[2]['km_l'] / 1000 
+        
+        # 稅金差異 (2.5L vs 2.0L)
+        tax_waste = (22410 - 17410) * years 
+        iphone_count = int(tax_waste / 30000) 
+        
+        st.markdown("#### ⚡ 工程師的「絕對領域」分析")
+        k1, k2, k3 = st.columns(3)
+        
+        with k1:
+            st.info("⛽ **省下的車價能跑多遠？**")
+            st.markdown(f"""
+            買 5.5 代汽油版省下的 **${saved_price:,}** 價差，
+            夠你加 **{int(gas_amount):,} 公升** 的油。
+            相當於可以 **免費繞台灣 {int(round_taiwan)} 圈**！
+            """)
+
+        with k2:
+            st.warning("💸 **稅金陷阱 (2.5L vs 2.0L)**")
+            st.markdown(f"""
+            若買 6 代或油電版，持有 {years} 年下來，
+            你將多繳 **${tax_waste:,}** 給政府。
+            這筆錢等於 **平白扔掉了 {iphone_count} 支 iPhone**。
+            """)
+
+        with k3:
+            st.success("📉 **真正的黃金交叉**")
+            # 簡單估算回本里程
+            # 每公里油錢成本差異 = (汽油車每公里油錢) - (6代新車每公里油錢)
+            cost_per_km_gas = gas_price / competitors[2]['km_l']
+            cost_per_km_new = gas_price / competitors[0]['km_l']
+            km_diff_cost = cost_per_km_gas - cost_per_km_new
+            
+            if km_diff_cost > 0:
+                # 需追回的總成本 = 車價差 + 稅金差
+                total_gap_to_cover = saved_price + tax_waste
+                break_even_km = total_gap_to_cover / km_diff_cost
+                
+                years_to_break_even = break_even_km / km_per_year if km_per_year > 0 else 99
+                
+                if years_to_break_even < 50:
+                    st.markdown(f"""
+                    想靠 6 代油電「省油」把車價賺回來？
+                    數學告訴我，你必須開 **{int(break_even_km):,} 公里**。
+                    以你現在的里程，要開 **{years_to_break_even:.1f} 年** 才能回本。
+                    """)
+                else:
+                     st.markdown("由於車價與稅金差距過大，**這輩子靠省油都賺不回成本**。")
+            else:
+                 st.markdown("油價或油耗數據異常，無法計算交叉點。")
+
+        st.markdown("---")
+        st.markdown("#### 📊 原始運算數據表")
         st.dataframe(df_chart)
 
 if __name__ == "__main__":
