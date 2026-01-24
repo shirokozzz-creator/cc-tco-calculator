@@ -6,57 +6,62 @@ import altair as alt
 # 0. 全域設定
 # ==========================================
 st.set_page_config(
-    page_title="[Beta] RAV4 旗艦對決", 
-    page_icon="⚔️", 
+    page_title="[戰情室] RAV4 鈔票焚化爐分析", 
+    page_icon="🔥", 
     layout="wide"
 )
 
 # ==========================================
-# 1. 核心功能：RAV4 旗艦大亂鬥
+# 1. 核心功能：RAV4 旗艦大亂鬥 (嚴謹版)
 # ==========================================
 def main():
-    st.title("⚔️ RAV4 世代大對決：旗艦版 TCO 試算")
-    st.caption("工程師觀點：當三台車都是「旗艦版」，誰才是數學上的贏家？")
+    st.title("🔥 RAV4 6代是神車還是「鈔票焚化爐」？")
+    st.markdown("### 工程師觀點：加入「隱形持有成本」後的殘酷真相")
 
     # --- 1. 側邊欄：參數與價格設定 ---
     with st.sidebar:
-        st.header("💰 車價設定 (請輸入成交價)")
-        st.caption("請輸入您詢問到的價格，系統會即時運算")
+        st.header("💰 1. 車價設定 (成交價)")
         
-        # 開放輸入價格 (預設值僅供參考)
         price_gen6 = st.number_input(
             "🔥 6代 2.5 Hybrid 旗艦 (新車)", 
-            value=1350000, 
-            step=10000,
-            help="預估 2026 年式 6 代油電二驅旗艦版的接單價"
+            value=1350000, step=10000,
+            help="預估 2026 年式接單價"
         )
         
         price_gen55_hyb = st.number_input(
             "⚡ 5.5代 2.5 Hybrid 旗艦 (二手)", 
-            value=1050000, 
-            step=10000,
-            help="鎖定 2023-2024 年式 (TSS 3.0) 的完全體旗艦"
+            value=1050000, step=10000,
+            help="2023-2024 完全體 (TSS 3.0)"
         )
         
         price_gen55_gas = st.number_input(
             "⛽ 5.5代 2.0 汽油 旗艦 (二手)", 
-            value=820000, 
-            step=10000,
-            help="鎖定 2022-2023 年式 汽油旗艦版"
+            value=820000, step=10000,
+            help="2022-2023 汽油旗艦 (稅金優勢)"
         )
         
         st.markdown("---")
-        st.header("⚙️ 用車情境模擬")
+        st.header("⚙️ 2. 用車情境")
         years = st.slider("預計持有年數", 1, 15, 10)
         km_per_year = st.slider("年行駛里程 (km)", 5000, 50000, 15000)
         gas_price = st.number_input("預估平均油價", value=31.0)
         
         st.markdown("---")
-        st.write("🔧 **維修/電池參數**")
+        st.header("🕵️‍♂️ 3. 隱形殺手 (工程師專用)")
+        st.caption("一般人只算油錢，菁英算的是機會成本")
+        
+        # 進階參數
+        ins_new = st.number_input("新車年保費 (乙式)", value=45000, help="新車前幾年通常被迫保乙式")
+        ins_used = st.number_input("二手年保費 (丙式)", value=18000, help="二手車通常保丙式就夠")
+        roi_rate = st.slider("資金投資年化報酬率 (%)", 0.0, 10.0, 5.0, step=0.5, 
+                             help="如果你把買車的錢拿去投資(如0050)，每年能賺多少？") / 100
+        
+        st.markdown("---")
+        st.write("🔧 **維修風險**")
         battery_cost = st.number_input("油電大電池更換費", value=65000)
-        risk_year = st.slider("第幾年更換電池？(風險模擬)", 5, 12, 8)
+        risk_year = st.slider("第幾年更換電池？", 5, 12, 8)
 
-    # --- 2. 選手數據庫 (規格固定，價格連動) ---
+    # --- 2. 選手數據庫 ---
     competitors = [
         {
             "name": "🔥 6代 Hybrid 旗艦 (新車)",
@@ -87,47 +92,65 @@ def main():
         }
     ]
 
-    # --- 3. TCO 運算邏輯 ---
+    # --- 3. TCO 嚴謹運算邏輯 ---
     chart_rows = []
     final_results = {} 
 
     for comp in competitors:
         current_val = comp['price']
         
+        # 累計成本初始化
+        cum_insurance = 0
+        cum_lost_interest = 0
+        
         for y in range(0, years + 1):
-            # A. 折舊模型
             if y == 0:
                 depreciation = 0
+                insurance = 0
+                interest_loss = 0
             else:
+                # A. 折舊 (Depreciation)
                 if comp['is_new']:
-                    # 新車前三年折舊重 (20%, 15%, 10%)
+                    # 新車前三年折舊重
                     if y == 1: drop_rate = 0.20
                     elif y == 2: drop_rate = 0.15
                     else: drop_rate = 0.10
                 else:
-                    # 二手車折舊相對平緩 (8%)
-                    drop_rate = 0.08
+                    drop_rate = 0.08 # 二手車平緩
                 
                 depreciation = current_val * drop_rate
                 current_val -= depreciation
-            
+                
+                # B. 保險成本 (Insurance)
+                # 新車前5年較貴(遞減)，二手車固定便宜
+                if comp['is_new'] and y <= 5:
+                    insurance = ins_new * (1 - (y-1)*0.05) 
+                else:
+                    insurance = ins_used
+                cum_insurance += insurance
+
+                # C. 資金機會成本 (Opportunity Cost)
+                # 簡單算法：車價 * 利率 (代表這筆錢被鎖在車上，沒辦法生利息的損失)
+                interest_loss = comp['price'] * roi_rate
+                cum_lost_interest += interest_loss
+
             # 累計折舊損失
             cum_depreciation = comp['price'] - current_val
 
-            # B. 油錢
+            # D. 油錢
             total_km = km_per_year * y
             fuel_cost = (total_km / comp['km_l']) * gas_price
             
-            # C. 稅金
+            # E. 稅金
             tax_cost = comp['tax'] * y
             
-            # D. 電池風險
+            # F. 電池風險
             battery_risk = 0
             if comp['is_hybrid'] and y >= risk_year:
                 battery_risk = battery_cost
 
-            # 總 TCO
-            total_tco = cum_depreciation + fuel_cost + tax_cost + battery_risk
+            # 總 TCO = 折舊 + 油 + 稅 + 電池 + 保險 + 機會成本
+            total_tco = cum_depreciation + fuel_cost + tax_cost + battery_risk + cum_insurance + cum_lost_interest
             
             chart_rows.append({
                 "年份": y,
@@ -140,22 +163,19 @@ def main():
 
     df_chart = pd.DataFrame(chart_rows)
 
-    # --- 4. 結果展示 ---
+    # --- 4. 結果展示區 ---
     
-    # 計算數據
     winner_name = min(final_results, key=final_results.get)
-    # loser_name = max(final_results.values()) # 暫時不用
-    # winner_val = final_results[winner_name] # 暫時不用
     gap = max(final_results.values()) - min(final_results.values())
     
-    # 顯示三個 Metric (與價格連動)
-    st.markdown("### 📊 10年總持有成本 (TCO) 預測")
+    # 顯示 Metrics
+    st.markdown(f"### 📊 {years}年總持有成本 (TCO) 預測")
     c1, c2, c3 = st.columns(3)
     
     with c1:
         name = competitors[0]['name']
         val = final_results[name]
-        st.metric(label=name, value=f"${val:,}", delta="基準")
+        st.metric(label=name, value=f"${val:,}", delta="基準 (焚化爐)")
     
     with c2:
         name = competitors[1]['name']
@@ -169,12 +189,11 @@ def main():
         diff = final_results[competitors[0]['name']] - val
         st.metric(label=name, value=f"${val:,}", delta=f"比 6代省 ${diff:,}")
 
-    # 冠軍分析
-    st.success(f"🏆 **最佳 CP 值冠軍：{winner_name}**")
-    st.info(f"💡 **工程師點評**：在年跑 **{km_per_year:,} km** 的情況下，選擇冠軍車型，可以幫你省下 **${gap:,}** 元 (相當於一台國產小車的錢)。")
+    st.success(f"🏆 **最佳理財工具：{winner_name}**")
+    st.info(f"💡 **工程師點評**：考慮折舊、稅金、保險與機會成本後，選擇冠軍車型可幫你守住 **${gap:,}** 的資產。")
 
-    # 視覺化圖表
-    st.markdown("### 📈 成本曲線圖 (越低越好)")
+    # Altair 圖表
+    st.markdown("### 📈 資金燃燒曲線 (越低越好)")
     chart = alt.Chart(df_chart).mark_line(strokeWidth=4).encode(
         x=alt.X('年份', axis=alt.Axis(tickMinStep=1)),
         y='累積總成本',
@@ -184,24 +203,26 @@ def main():
         )),
         tooltip=['年份', '車型', '累積總成本']
     ).interactive()
-    
     st.altair_chart(chart, use_container_width=True)
 
-# --- 5. 詳細數據與工程師震撼分析 (斬殺版) ---
+    # --- 5. 流量核彈區 (鈔票焚化爐 + 斬殺線) ---
+    st.markdown("---")
+    st.subheader("🔥 警告：系統判定為「鈔票焚化爐」 (Cash Incinerator)")
+    
     with st.expander("💀 點擊查看：工程師的「殘酷真相」報告 (心臟不好勿入)", expanded=True):
         
-        # === Part 1: 具象化分析 (繞台灣、iPhone) ===
+        # 計算斬殺參數 (6代 vs 5.5代汽油)
+        saved_price = competitors[0]['price'] - competitors[2]['price'] # 價差
         
-        # 計算差額參數 (6代新車 vs 5.5代汽油)
-        saved_price = competitors[0]['price'] - competitors[2]['price'] 
-        gas_amount = saved_price / gas_price if gas_price > 0 else 0
-        round_taiwan = gas_amount * competitors[2]['km_l'] / 1000 
-        
-        # 稅金差異 (2.5L vs 2.0L)
+        # 稅金差異
         tax_waste = (22410 - 17410) * years 
         iphone_count = int(tax_waste / 30000) 
+        
+        # 繞台灣
+        gas_amount = saved_price / gas_price if gas_price > 0 else 0
+        round_taiwan = gas_amount * competitors[2]['km_l'] / 1000 
 
-        st.markdown("#### ⚡ 階段一：絕對領域分析")
+        st.markdown("#### ⚡ 階段一：絕對領域分析 (物理攻擊)")
         k1, k2, k3 = st.columns(3)
         
         with k1:
@@ -213,58 +234,41 @@ def main():
             """)
 
         with k2:
-            st.warning("💸 **稅金陷阱 (2.5L vs 2.0L)**")
+            st.warning("💸 **稅金智商稅 (2.5L)**")
             st.markdown(f"""
-            若買 6 代，持有 {years} 年下來，
-            你將多繳 **${tax_waste:,}** 給政府。
-            這筆錢等於 **平白扔掉了 {iphone_count} 支 iPhone**。
+            若買 6 代 2.5L，{years} 年將多繳 **${tax_waste:,}** 稅金。
+            這筆錢沒換來任何馬力，等於 **平白扔掉了 {iphone_count} 支 iPhone**。
             """)
-
-        with k3:
-            st.success("📉 **回本難度係數**")
-            # 簡單估算回本里程
-            cost_per_km_gas = gas_price / competitors[2]['km_l']
-            cost_per_km_new = gas_price / competitors[0]['km_l']
-            km_diff_cost = cost_per_km_gas - cost_per_km_new
-            
-            if km_diff_cost > 0:
-                total_gap_to_cover = saved_price + tax_waste
-                break_even_km = total_gap_to_cover / km_diff_cost
-                years_to_break_even = break_even_km / km_per_year if km_per_year > 0 else 99
-                
-                if years_to_break_even < 50:
-                    st.markdown(f"""
-                    想靠 6 代油電「省油」把車價賺回來？
-                    你必須開 **{int(break_even_km):,} 公里**。
-                    以目前里程，要 **{years_to_break_even:.1f} 年** 才能回本。
-                    """)
-                else:
-                     st.markdown("由於車價與稅金差距過大，**這輩子靠省油都賺不回成本**。")
-            else:
-                 st.markdown("無法計算交叉點。")
-
-        # === Part 2: 斬殺線 (Kill Zone) ===
-        st.markdown("---")
-        st.subheader("🩸 階段二：Brian 的斬殺線 (Kill Zone)")
-        st.caption("工程師如果不算這筆帳，你可能永遠不知道自己損失了什麼。")
         
-        # 計算斬殺參數
-        # 假設月薪 8 萬 (工程師平均) -> 日薪約 3,600 (以22工作天計)
+        with k3:
+             st.success("🛡️ **保險階級差異**")
+             ins_diff = (ins_new - ins_used) * 5 # 簡單估算前5年差額
+             st.markdown(f"""
+             新車被迫保乙式，二手車只需丙式。
+             光是保險費，前五年你就多付了約 **${int(ins_diff):,}**。
+             這筆錢已經夠你換 4 條頂級輪胎。
+             """)
+
+        # === 斬殺線 (Kill Zone) ===
+        st.markdown("---")
+        st.markdown("#### 🩸 階段二：Brian 的斬殺線 (精神爆擊)")
+        
+        # 假設月薪 8 萬
         monthly_salary = 80000
         daily_salary = monthly_salary / 22
         work_months = saved_price / monthly_salary
         work_days = saved_price / daily_salary
         
-        # 投資複利損失 (10年, 6%年化)
-        future_value = saved_price * (1.06 ** years)
+        # 投資複利損失 (10年)
+        future_value = saved_price * ((1 + roi_rate) ** years)
         lost_wealth = future_value - saved_price
         
         kz1, kz2 = st.columns(2)
         
         with kz1:
-            st.error(f"⚰️ **生命能量消耗**")
+            st.error(f"⚰️ **奴隸指數 (Slave Index)**")
             st.markdown(f"""
-            為了這台 6 代新車，你多花的錢相當於：
+            為了買 6 代新車，你多花的錢相當於：
             **你必須不吃不喝工作 {work_months:.1f} 個月**。
             
             也就是說，你接下來的 **{int(work_days)} 個工作天**，
@@ -273,9 +277,9 @@ def main():
             """)
             
         with kz2:
-            st.error(f"📉 **財富自由阻礙**")
+            st.error(f"📉 **財富失速警告 (Stall Warning)**")
             st.markdown(f"""
-            如果把省下的 **${saved_price:,}** 拿去買 0050 (假設年化 6%)：
+            如果把省下的 **${saved_price:,}** 拿去投資 (年化 {roi_rate*100}%)：
             {years} 年後，這筆錢會滾成 **${int(future_value):,}**。
             
             選錯車的代價，不只是現在多付錢，
