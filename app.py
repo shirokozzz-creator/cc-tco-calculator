@@ -4,6 +4,7 @@ import os
 import math
 import altair as alt
 import numpy as np
+import csv  # 新增這個模組來處理 CSV 寫入
 from datetime import datetime
 
 # ==========================================
@@ -12,20 +13,23 @@ from datetime import datetime
 st.set_page_config(page_title="Brian 的航太級車況實驗室", page_icon="✈️", layout="wide")
 
 # ==========================================
-# 🛠️ 共用工具函式 (存名單用)
+# 🛠️ 共用工具函式 (存名單用 - 防彈版)
 # ==========================================
 def save_lead(email, model, note="Waitlist"):
-    file_name = "leads.csv"
+    # 🔥 修改檔名：避開原本壞掉的舊檔案，建立全新的資料庫
+    file_name = "leads_v2.csv"
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
     # 如果檔案不存在，先建立標題列
     if not os.path.exists(file_name):
-        with open(file_name, "w", encoding='utf-8-sig') as f:
-            f.write("Time,Model,Email,Status,Note\n")
+        with open(file_name, "w", newline="", encoding='utf-8-sig') as f:
+            writer = csv.writer(f)
+            writer.writerow(["Time", "Model", "Email", "Status", "Note"])
             
-    # 寫入資料
-    with open(file_name, "a", encoding='utf-8-sig') as f:
-        f.write(f"{timestamp},{model},{email},Waitlist,{note}\n")
+    # 寫入資料 (使用 csv.writer 避免逗號造成格式錯誤)
+    with open(file_name, "a", newline="", encoding='utf-8-sig') as f:
+        writer = csv.writer(f)
+        writer.writerow([timestamp, model, email, "Waitlist", note])
 
 # ==========================================
 # 🚗 功能 A：Toyota TCO 精算機 (公開版)
@@ -70,22 +74,28 @@ def page_toyota_tco():
     st.sidebar.markdown("---")
     with st.sidebar.expander("🕵️‍♂️ 管理員後台 (查名單)"):
         admin_pwd = st.text_input("輸入密碼", type="password", key="admin_check")
+        # 🔥 這裡也要改成讀取新檔案
+        target_file = "leads_v2.csv"
+        
         if admin_pwd == "uc0088":  
-            if os.path.exists("leads.csv"):
-                # 讀取並顯示名單
-                df_leads = pd.read_csv("leads.csv")
-                st.write(f"目前累積：{len(df_leads)} 筆")
-                st.dataframe(df_leads)
-                
-                # 下載按鈕
-                csv = df_leads.to_csv(index=False).encode('utf-8-sig')
-                st.download_button(
-                    "📥 下載 CSV 檔案",
-                    csv,
-                    "leads.csv",
-                    "text/csv",
-                    key='download-csv'
-                )
+            if os.path.exists(target_file):
+                try:
+                    # 🔥 加入 on_bad_lines='skip' 防止程式崩潰
+                    df_leads = pd.read_csv(target_file, on_bad_lines='skip')
+                    st.write(f"目前累積：{len(df_leads)} 筆")
+                    st.dataframe(df_leads)
+                    
+                    # 下載按鈕
+                    csv_data = df_leads.to_csv(index=False).encode('utf-8-sig')
+                    st.download_button(
+                        "📥 下載 CSV 檔案",
+                        csv_data,
+                        "leads_v2.csv",
+                        "text/csv",
+                        key='download-csv'
+                    )
+                except Exception as e:
+                    st.error(f"讀取檔案時發生錯誤：{e}")
             else:
                 st.warning("📂 資料庫目前是空的 (還沒人填寫)")
             
