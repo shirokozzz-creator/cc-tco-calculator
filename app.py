@@ -20,11 +20,11 @@ def save_lead(email, model, note="Waitlist"):
     
     # 如果檔案不存在，先建立標題列
     if not os.path.exists(file_name):
-        with open(file_name, "w", encoding='utf-8') as f:
+        with open(file_name, "w", encoding='utf-8-sig') as f:
             f.write("Time,Model,Email,Status,Note\n")
             
     # 寫入資料
-    with open(file_name, "a", encoding='utf-8') as f:
+    with open(file_name, "a", encoding='utf-8-sig') as f:
         f.write(f"{timestamp},{model},{email},Waitlist,{note}\n")
 
 # ==========================================
@@ -65,7 +65,8 @@ def page_toyota_tco():
     gas_price = st.sidebar.number_input("目前油價", value=31.0)
     battery_cost = st.sidebar.number_input("大電池更換預算", value=params["battery"])
     force_battery = st.sidebar.checkbox("⚠️ 強制列入電池成本", value=False)
-# --- 補回管理員後台 ---
+
+    # --- 管理員後台 ---
     st.sidebar.markdown("---")
     with st.sidebar.expander("🕵️‍♂️ 管理員後台 (查名單)"):
         admin_pwd = st.text_input("輸入密碼", type="password", key="admin_check")
