@@ -46,7 +46,7 @@ st.markdown("""
         color: #8d99ae;
     }
     
-    /* 重點文字高亮 */
+    /* 重點文字高亮與卡片樣式 */
     .highlight {
         color: #d90429; 
         font-weight: bold;
@@ -71,7 +71,7 @@ st.markdown("""
 # 1. 數據核心 (整合 HAA/SAA 真實拍賣紀錄)
 # ==========================================
 def load_data():
-    # 這是基於你提供的 2025/2026 PDF 檔案整理出的精選數據
+    # 這是基於 2025/2026 PDF 檔案整理出的精選數據
     # 包含了查定等級 (Grade) 與真實里程
     data = [
         # --- RAV4 ---
@@ -210,7 +210,7 @@ def generate_line_link(brand, model, budget, year_range):
     return message
 
 # ==========================================
-# 4. 側邊欄內容 (SOP 流程)
+# 4. 側邊欄內容 (SOP 與金流流程)
 # ==========================================
 def sidebar_content():
     with st.sidebar:
@@ -219,40 +219,35 @@ def sidebar_content():
         
         st.markdown("---")
         
-        # --- 航太級代標 SOP ---
-        st.subheader("🚀 代標標準作業程序 (SOP)")
+        # --- 航太級代標 SOP (金流修正版) ---
+        st.subheader("🚀 代標標準作業程序")
         st.markdown("""
         <div style="font-size: 0.9rem; line-height: 1.6;">
         
         **Step 1. 鎖定 (Target)**
-        <br>👉 在此 App 搜尋或填寫許願單。
+        <br>👉 搜尋車源，確認目標。
         
-        **Step 2. 查驗 (Verify)**
-        <br>👉 我提供原始查定表 (綠燈認證)。
+        **Step 2. 簽約 (Contract)**
+        <br>👉 線上簽署委託書，匯入押標金。
         
-        **Step 3. 出價 (Bid)**
-        <br>👉 確認車況無誤，匯入保證金。
+        **Step 3. 競標 (Bidding)**
+        <br>👉 若<b>未得標</b>，押金全額退還。
+        <br>👉 若<b>得標</b>，押金轉為定金。
         
-        **Step 4. 得標 (Win)**
-        <br>👉 <b style='color:#d90429'>車價直接匯給拍賣場</b> (透明)。
+        **Step 4. 結算 (Settlement)**
+        <br>👉 款項匯入<b>本公司履約帳戶</b>。
         
         **Step 5. 交車 (Handover)**
-        <br>👉 支付我技術費，快樂交車。
+        <br>👉 驗收完成，快樂交車。
         
         </div>
         """, unsafe_allow_html=True)
         
         st.markdown("---")
-        
-        # --- 專家形象與聯絡 ---
-        st.info("💡 **核心價值：**\n我們不賣車，我們幫你買車。\n用數據還原真相，拒絕資訊落差。")
+        st.info("💡 **安心承諾：**\n所有款項皆進入公司履約帳戶，專款專用，嚴格遵守合約精神。")
         
         st.write("📞 **聯絡工程師**")
-        st.link_button(
-            label="💬 加 LINE 啟動流程", 
-            url="https://line.me/ti/p/你的LineID", 
-            use_container_width=True
-        )
+        st.link_button("💬 加 LINE 啟動流程", "https://line.me/ti/p/你的LineID", use_container_width=True)
         st.caption("數據最後更新：2026/01/26")
 
 # ==========================================
@@ -267,7 +262,7 @@ def main():
     st.caption("全台唯一：用「飛行前拆解」標準檢視中古車")
     
     # --- Tabs 分頁設計 ---
-    tab1, tab2, tab3 = st.tabs(["🔍 戰情搜尋", "🛡️ 驗車標準", "✨ 許願代尋"])
+    tab1, tab2, tab3 = st.tabs(["🔍 戰情搜尋", "📜 交易守則", "✨ 許願代尋"])
 
     # === Tab 1: 戰情搜尋 (核心功能) ===
     with tab1:
@@ -341,26 +336,86 @@ def main():
             st.markdown("---")
             st.markdown(f"### 🏁 最終入手價：<span class='highlight'>${total_price:,}</span>", unsafe_allow_html=True)
             st.warning(f"🎁 **恭喜！你省下了 ${savings:,}**\n\n這筆錢等於送你：**{bonus}**")
+            
+            # --- 新增：價格下方的詳細付款時程表 ---
+            with st.expander("📝 點此查看：這台車的「付款時程表」"):
+                st.markdown(f"""
+                若這台車於 **週三** 得標，您的付款流程如下：
+                
+                1. **委託時**：支付押標金 `$30,000` (未得標全額退款)。
+                2. **週三 (得標日)**：我方提供拍賣場得標單據。
+                3. **週五 (得標後第2天)**：中午 12:00 前，將尾款匯入本公司履約帳戶。
+                4. **交車時**：支付過戶保證金 `$10,000` (過戶完即退) + 技術服務費。
+                
+                *一切公開透明，金流直接對應拍賣場規範。*
+                """)
 
             # CTA
             st.write("拍賣場庫存流動極快，請把握機會。")
             st.link_button("👉 私訊 Brian，啟動代標程序", "https://line.me/ti/p/你的LineID", use_container_width=True)
 
-    # === Tab 2: 驗車標準 (信任建設) ===
+    # === Tab 2: 交易守則與合約 (法務升級版) ===
     with tab2:
-        st.markdown("### 🛡️ 什麼是「飛行前拆解」標準？")
-        st.write("航空業容許誤差是 0.01 公分。我將這套標準帶入中古車檢驗。")
+        st.header("📜 交易守則與合約精神")
+        st.caption("本服務採用「數位委託」模式，所有流程皆有電子紀錄，具備法律效力。")
+
+        # 重點強調卡片
+        st.warning("""
+        **⚖️ 關於押標金 (Deposit Policy)**
         
-        st.markdown("#### 1. 綠燈認證 (Green Light)")
-        st.info("我們只挑選查定表為 **Grade A / Grade 4** 以上的車源。結構如有任何損傷 (R級/事故)，系統直接過濾。")
+        1. **未得標退款**：若競標失敗，押標金 $30,000 將於 **1 個工作天內** 全額退還至您的帳戶，不扣除任何手續費。
+        2. **得標轉定金**：若競標成功，押標金直接轉為購車定金。
+        """)
+
+        col_rule1, col_rule2 = st.columns(2)
         
-        st.markdown("#### 2. 真實里程 (Real Mileage)")
-        st.info("比對監理站與原廠紀錄，杜絕調表車。")
-        
-        st.markdown("#### 3. 原始車況 (Raw Condition)")
-        st.info("我們不幫車子化妝。刮傷就是刮傷，凹痕就是凹痕。你看到的就是最真實的樣子，**因為你買的是車，不是化妝品。**")
-        
-        st.caption("數據來源：本系統數據串接 HAA / SAA 競拍中心真實成交紀錄。")
+        with col_rule1:
+            st.subheader("💰 資金安全聲明")
+            st.markdown("""
+            <div style="background-color:#f8f9fa; padding:15px; border-radius:10px; border-left: 5px solid #d90429;">
+            
+            **1. 公司帳戶履約 (Corporate Account)**
+            <br>所有購車款項皆須匯入本公司指定之<b>公司履約帳戶</b>。絕不使用個人帳戶收款，確保金流軌跡透明。
+            
+            <hr>
+            
+            **2. 專款專用 (Earmarked Funds)**
+            <br>您的款項僅用於支付該得標車輛之拍賣尾款與相關規費，絕無挪用。
+            
+            <hr>
+            
+            **3. 電子合約 (Digital Contract)**
+            <br>啟動服務前，雙方需透過 LINE 或 Email 簽署正式<b>「代標委託書」</b>，保障雙方權益。
+            
+            </div>
+            """, unsafe_allow_html=True)
+
+        with col_rule2:
+            st.subheader("🛡️ 違約與棄標規範")
+            st.markdown("""
+            **1. 棄標責任**
+            <br>若得標後委託人棄標，押標金 $30,000 將全數沒收，用於賠償拍賣場之違約金與我方作業損失。
+            
+            **2. 結清期限**
+            <br>得標後 **48小時內** (通常為隔日) 需結清尾款。逾期視同棄標，請務必確認資金到位。
+            
+            **3. 車況不符**
+            <br>若交車時車況與「查定表」記載有重大出入 (如：註明無泡水卻有泡水)，我方將協助向拍賣場申請退車索賠。
+            """, unsafe_allow_html=True)
+            
+        # 模擬合約預覽
+        with st.expander("📄 點此預覽：標準代標委託書範本"):
+            st.markdown("""
+            **【中古汽車代標委託書】(摘要)**
+            
+            **立委託書人 (以下簡稱甲方) 委託 (以下簡稱乙方) 代為競標車輛...**
+            
+            1. **委託標的**：甲方委託乙方於拍賣場競標指定車輛。
+            2. **費用結構**：成交價 + 技術服務費 + 拍賣場手續費 + 過戶規費。
+            3. **退款機制**：若未得標，乙方應無息退還甲方全額押標金。
+            4. **交付方式**：乙方確認車輛過戶完成後，通知甲方交車。
+            ... (此為範本，正式合約將透過官方 LINE 提供)
+            """)
 
     # === Tab 3: 許願代尋 (客製化服務) ===
     with tab3:
@@ -377,16 +432,23 @@ def main():
             w_model = st.text_input("車型 (例如：RAV4, CRV)", placeholder="請輸入車款名稱")
             w_year = st.slider("希望年份 (最低接受)", 2015, 2026, 2020)
             
+            st.markdown("---")
+            
+            # 新增：同意條款 (Micro-commitment)
+            agree_contract = st.checkbox("我已閱讀並同意 Tab 2 之「交易守則」與「退款規範」。(未得標全額退款)")
+            
             submitted = st.form_submit_button("🚀 送出委託 (連線 LINE)")
             
             if submitted:
-                if w_model:
+                if w_model and agree_contract:
                     msg = generate_line_link(w_brand, w_model, w_budget, f"{w_year}年後")
                     st.success("✅ 需求單已生成！請複製下方文字傳送給我：")
                     st.code(msg, language="text")
                     st.link_button("👉 點此開啟 LINE", "https://line.me/ti/p/你的LineID", use_container_width=True)
-                else:
+                elif not w_model:
                     st.error("❌ 請輸入想找的車型")
+                elif not agree_contract:
+                    st.error("❌ 請勾選「我已閱讀並同意交易守則」方可送出。")
 
 if __name__ == "__main__":
     main()
