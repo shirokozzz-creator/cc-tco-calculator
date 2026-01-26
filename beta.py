@@ -14,10 +14,10 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS 優化：按鈕、字體、配色
+# CSS 優化：按鈕、字體、配色 (Toyota Red + 深灰科技感)
 st.markdown("""
     <style>
-    /* 主按鈕樣式 - Toyota Red */
+    /* 主按鈕樣式 */
     .stButton>button {
         width: 100%; 
         border-radius: 12px; 
@@ -57,6 +57,12 @@ st.markdown("""
         padding: 15px;
         border-radius: 5px;
         font-size: 0.95rem;
+        margin-bottom: 20px;
+    }
+    
+    /* 側邊欄優化 */
+    [data-testid="stSidebar"] {
+        background-color: #f1f3f5;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -166,11 +172,11 @@ def draw_radar_chart(scores, model_name):
             radialaxis=dict(
                 visible=True,
                 range=[0, 10],
-                tickfont=dict(size=8, color='gray'),
+                tickfont=dict(size=9, color='gray'),
                 linecolor='lightgray'
             ),
             angularaxis=dict(
-                tickfont=dict(size=12, color='#2b2d42',  weight="bold"),
+                tickfont=dict(size=12, color='#2b2d42',  family="Arial Black"),
                 rotation=90
             )
         ),
@@ -198,32 +204,63 @@ def calculate_bonus(savings):
         return "⌚️ 勞力士 Submariner (黑水鬼)"
 
 def generate_line_link(brand, model, budget, year_range):
-    # 請務必修改這裡的 Line ID
+    # 【注意】請務必修改這裡的 Line ID
     line_id = "你的LineID" 
     message = f"Hi Brian，我是從 App 許願池來的。\n我想找一台：{brand} {model}\n年份希望：{year_range}\n預算大約：{budget}\n\n請問本週拍賣場有適合的綠燈車源嗎？"
     return message
 
 # ==========================================
-# 4. 主程式介面
+# 4. 側邊欄內容 (SOP 流程)
 # ==========================================
-def main():
-    # --- Sidebar: 專家形象 ---
+def sidebar_content():
     with st.sidebar:
         st.header("🛫 Brian 航太數據室")
-        st.markdown("""
-        **資深航太工程師監製**
+        st.caption("資深航太工程師監製")
         
-        我們運用 **HAA / SAA 拍賣場大數據**，
-        剔除行銷泡沫，還原車輛的「機械淨值」。
-        
-        - 🚫 **拒絕修圖美照**
-        - ✅ **只看查定數據**
-        - 💰 **代標不賺差價**
-        """)
-        st.info("💡 數據庫最後更新：2026/01/26")
         st.markdown("---")
+        
+        # --- 航太級代標 SOP ---
+        st.subheader("🚀 代標標準作業程序 (SOP)")
+        st.markdown("""
+        <div style="font-size: 0.9rem; line-height: 1.6;">
+        
+        **Step 1. 鎖定 (Target)**
+        <br>👉 在此 App 搜尋或填寫許願單。
+        
+        **Step 2. 查驗 (Verify)**
+        <br>👉 我提供原始查定表 (綠燈認證)。
+        
+        **Step 3. 出價 (Bid)**
+        <br>👉 確認車況無誤，匯入保證金。
+        
+        **Step 4. 得標 (Win)**
+        <br>👉 <b style='color:#d90429'>車價直接匯給拍賣場</b> (透明)。
+        
+        **Step 5. 交車 (Handover)**
+        <br>👉 支付我技術費，快樂交車。
+        
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.markdown("---")
+        
+        # --- 專家形象與聯絡 ---
+        st.info("💡 **核心價值：**\n我們不賣車，我們幫你買車。\n用數據還原真相，拒絕資訊落差。")
+        
         st.write("📞 **聯絡工程師**")
-        st.link_button("加 LINE 索取完整清單", "https://line.me/ti/p/你的LineID", use_container_width=True)
+        st.link_button(
+            label="💬 加 LINE 啟動流程", 
+            url="https://line.me/ti/p/你的LineID", 
+            use_container_width=True
+        )
+        st.caption("數據最後更新：2026/01/26")
+
+# ==========================================
+# 5. 主程式架構
+# ==========================================
+def main():
+    # 呼叫側邊欄
+    sidebar_content()
 
     # --- Header ---
     st.title("✈️ Brian 航太數據選車室")
