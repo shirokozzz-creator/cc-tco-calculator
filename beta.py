@@ -15,16 +15,16 @@ st.set_page_config(
 )
 
 # ==========================================
-# 0.5 世代識別資料庫 (Toyota 系譜)
+# 0.5 世代識別資料庫 (Toyota 全車系系譜)
 # ==========================================
 # 定義各車型世代對應的年份範圍
 GENERATION_DB = {
     "RAV4": {
-        "五代 (TNGA底盤)": [2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026],
-        "4.5代 (末代改款)": [2016, 2017, 2018],
+        "五代 (TNGA)": [2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026],
+        "4.5代 (末代)": [2016, 2017, 2018],
         "4代": [2013, 2014, 2015]
     },
-    "Corolla": { # 對應 Corolla Cross
+    "Corolla Cross": {
         "一代 (小改款/新油電)": [2024, 2025, 2026],
         "一代 (前期)": [2020, 2021, 2022, 2023]
     },
@@ -32,9 +32,54 @@ GENERATION_DB = {
         "12代 (TNGA)": [2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026],
         "11.5代 (X版/經典)": [2016, 2017, 2018]
     },
+    "Camry": {
+        "八代 (TNGA/進口)": [2018, 2019, 2020, 2021, 2022, 2023, 2024],
+        "九代 (最新款)": [2024, 2025, 2026],
+        "7.5代 (國產末代)": [2015, 2016, 2017]
+    },
     "Yaris": {
         "三代 (後期/Crossover)": [2018, 2019, 2020, 2021, 2022, 2023],
         "三代 (前期)": [2014, 2015, 2016, 2017]
+    },
+    "Yaris Cross": {
+        "一代 (跨界鴨)": [2023, 2024, 2025, 2026]
+    },
+    "Vios": {
+        "三代 (小改款)": [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026],
+        "三代 (前期)": [2014, 2015, 2016, 2017]
+    },
+    "Sienta": {
+        "一代 (小改款/Crossover)": [2019, 2020, 2021, 2022, 2023, 2024, 2025],
+        "一代 (前期)": [2016, 2017, 2018]
+    },
+    "Town Ace": {
+        "一代 (發財王牌)": [2022, 2023, 2024, 2025, 2026]
+    },
+    "C-HR": {
+        "一代 (進口跑旅)": [2017, 2018, 2019, 2020, 2021, 2022, 2023]
+    },
+    "Corolla Sport": { 
+        "12代 (Auris/Sport)": [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025]
+    },
+    "Alphard": {
+        "四代 (LM雙生)": [2023, 2024, 2025, 2026],
+        "三代 (運兵車)": [2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022]
+    },
+    "Sienna": {
+        "四代 (油電)": [2021, 2022, 2023, 2024, 2025, 2026],
+        "三代 (3.5 V6)": [2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020]
+    },
+    "Previa": {
+        "三代 (子彈列車)": [2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019]
+    },
+    "Wish": {
+        "二代 (末代神車)": [2013, 2014, 2015, 2016]
+    },
+    "bZ4X": {
+        "一代 (純電)": [2022, 2023, 2024, 2025, 2026]
+    },
+    "Hilux": {
+        "八代 (皮卡)": [2019, 2020, 2021, 2022, 2023, 2024, 2025, 2026]
     }
 }
 
@@ -92,7 +137,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # ==========================================
-# 1. 數據核心 (HAA/SAA 真實數據邏輯)
+# 1. 數據核心 (HAA/SAA 真實數據邏輯 - 全車系)
 # ==========================================
 def load_data():
     data = [
@@ -143,30 +188,127 @@ def load_data():
             "scores": [10, 8, 8, 8, 6], 
             "desc": "12代神車，TNGA 底盤操控大升級。"
         },
-         {
-            "brand": "Toyota", "model": "Altis", "year": "2018/06", 
+        {
+            "brand": "Toyota", "model": "Altis", "year": "2017/06", 
             "grade": "Grade B (4分)", "mileage": "90,000km",
             "market_price": 350000, "auction_price": 280000, 
             "scores": [10, 7, 6, 7, 6], 
             "desc": "11.5代經典款，結構單純好養，零件超便宜。"
         },
 
-        # --- Yaris ---
+        # --- Camry ---
+        {
+            "brand": "Toyota", "model": "Camry (汽油)", "year": "2020/08", 
+            "grade": "Grade A (4.5分)", "mileage": "55,000km",
+            "market_price": 720000, "auction_price": 630000, 
+            "scores": [8, 8, 9, 7, 9], 
+            "desc": "八代進口 Camry，主管座駕，氣派與舒適兼具。"
+        },
+        {
+            "brand": "Toyota", "model": "Camry (油電)", "year": "2022/03", 
+            "grade": "Grade A (4.5分)", "mileage": "42,000km",
+            "market_price": 880000, "auction_price": 780000, 
+            "scores": [8, 9, 9, 10, 9], 
+            "desc": "油電旗艦，極度省油的大型房車，隔音表現優異。"
+        },
+
+        # --- Yaris & Yaris Cross ---
         {
             "brand": "Toyota", "model": "Yaris", "year": "2022/09", 
             "grade": "Grade A (4.5分)", "mileage": "18,000km",
             "market_price": 520000, "auction_price": 445000, 
             "scores": [9, 10, 6, 7, 5], 
-            "desc": "絕版品，市場上掃一台少一台，極度保值。"
+            "desc": "絕版品小鴨，市場上掃一台少一台，極度保值。"
         },
-        
-        # --- Town Ace ---
+        {
+            "brand": "Toyota", "model": "Yaris Cross", "year": "2024/05", 
+            "grade": "Grade S (5分)", "mileage": "2,000km",
+            "market_price": 720000, "auction_price": 635000, 
+            "scores": [9, 9, 7, 8, 8], 
+            "desc": "市場當紅炸子雞，跨界小休旅，空間比想像中大。"
+        },
+
+        # --- Vios ---
+        {
+            "brand": "Toyota", "model": "Vios", "year": "2021/11", 
+            "grade": "Grade A (4.5分)", "mileage": "25,000km",
+            "market_price": 430000, "auction_price": 360000, 
+            "scores": [10, 8, 5, 8, 5], 
+            "desc": "國民代步車，持有成本極低，適合新手練車。"
+        },
+
+        # --- 商務/MPV ---
         {
             "brand": "Toyota", "model": "Town Ace (發財車)", "year": "2024/01", 
             "grade": "Grade S (新車)", "mileage": "800km",
             "market_price": 560000, "auction_price": 485000, 
             "scores": [10, 9, 6, 8, 10], 
             "desc": "買來賺錢的，省下的價差直接當作第一筆創業金。"
+        },
+        {
+            "brand": "Toyota", "model": "Sienta", "year": "2023/05", 
+            "grade": "Grade A", "mileage": "22,000km",
+            "market_price": 680000, "auction_price": 585000, 
+            "scores": [9, 8, 7, 8, 10], 
+            "desc": "家庭好爸爸專車，滑門超方便。空間機能無敵。"
+        },
+        {
+            "brand": "Toyota", "model": "Alphard", "year": "2019/10", 
+            "grade": "Grade A (4.5分)", "mileage": "60,000km",
+            "market_price": 2300000, "auction_price": 2050000, 
+            "scores": [7, 10, 9, 5, 10], 
+            "desc": "陸地頭等艙，老闆專用車。保值性驚人，氣場強大。"
+        },
+        {
+            "brand": "Toyota", "model": "Sienna", "year": "2022/06", 
+            "grade": "Grade A", "mileage": "30,000km",
+            "market_price": 2100000, "auction_price": 1850000, 
+            "scores": [8, 9, 10, 9, 10], 
+            "desc": "美規正七人座油電，家庭旅遊首選，油耗表現令人驚艷。"
+        },
+        {
+            "brand": "Toyota", "model": "Previa", "year": "2018/12", 
+            "grade": "Grade B (4分)", "mileage": "88,000km",
+            "market_price": 950000, "auction_price": 820000, 
+            "scores": [8, 9, 7, 6, 9], 
+            "desc": "絕版子彈列車，正七人座最舒適的第三排，依然搶手。"
+        },
+        {
+            "brand": "Toyota", "model": "Wish", "year": "2016/09", 
+            "grade": "Grade B (4分)", "mileage": "120,000km",
+            "market_price": 450000, "auction_price": 360000, 
+            "scores": [9, 8, 6, 7, 9], 
+            "desc": "末代 Wish，計程車司機的最愛，零件多又好修。"
+        },
+
+        # --- 進口/個性 ---
+        {
+            "brand": "Toyota", "model": "C-HR", "year": "2019/04", 
+            "grade": "Grade A", "mileage": "45,000km",
+            "market_price": 650000, "auction_price": 560000, 
+            "scores": [7, 8, 8, 8, 6], 
+            "desc": "進口跨界跑旅，外型前衛，安全性佳。"
+        },
+        {
+            "brand": "Toyota", "model": "Corolla Sport (Auris)", "year": "2021/07", 
+            "grade": "Grade A", "mileage": "35,000km",
+            "market_price": 700000, "auction_price": 610000, 
+            "scores": [8, 8, 9, 8, 6], 
+            "desc": "日製進口掀背 (Auris)，TNGA 底盤操控樂趣十足。"
+        },
+        {
+            "brand": "Toyota", "model": "bZ4X", "year": "2023/11", 
+            "grade": "Grade S", "mileage": "5,000km",
+            "market_price": 1050000, "auction_price": 920000, 
+            "scores": [7, 6, 9, 10, 8], 
+            "desc": "Toyota 純電休旅，享受電動車的寧靜與加速感。"
+        },
+        {
+            "brand": "Toyota", "model": "Hilux", "year": "2022/02", 
+            "grade": "Grade A", "mileage": "40,000km",
+            "market_price": 1150000, "auction_price": 1020000, 
+            "scores": [8, 9, 9, 6, 9], 
+            "desc": "耐用度神話，上山下海露營神車，保值性極高。"
         }
     ]
     
@@ -283,7 +425,8 @@ def main():
             model_list = df[df['brand']==selected_brand]['model'].unique()
             selected_model_raw = st.selectbox("車型", model_list)
             # 取得車型關鍵字 (例如 "RAV4 (汽油)" -> "RAV4") 以對應 DB
-            db_model_key = selected_model_raw.split(" ")[0] 
+            # 修正邏輯：以 " (" 分割取第一部分，避免括號問題
+            db_model_key = selected_model_raw.split(" (")[0] 
 
         # Row 2: 世代選擇器 (核心功能)
         if db_model_key in GENERATION_DB:
@@ -304,7 +447,7 @@ def main():
             ]
         else:
             # 若無世代資料，退回一般年份篩選
-            st.warning("⚠️ 此車型尚無世代資料，改用年份篩選")
+            st.warning("⚠️ 此車型暫無世代資料，改用年份篩選")
             available_years = df[df['model']==selected_model_raw]['year'].unique()
             selected_year_str = st.selectbox("年份", available_years)
             filtered_df = df[(df['model'] == selected_model_raw) & (df['year'] == selected_year_str)]
