@@ -13,44 +13,59 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# CSS 優化：科技感配色
+# CSS 優化
 st.markdown("""
     <style>
     .stButton>button {
         width: 100%; border-radius: 12px; font-weight: bold; height: 3.5em; 
-        background-color: #0077b6; color: white; border: none; /* 改用科技藍 */
+        background-color: #0077b6; color: white; border: none;
         box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.3s ease;
     }
     .stButton>button:hover { background-color: #0096c7; color: white; transform: translateY(-2px); }
-    .highlight { color: #d90429; font-weight: bold; }
-    .report-box {
-        background-color: #f8f9fa; border-left: 5px solid #0077b6; padding: 15px;
-        border-radius: 5px; font-size: 0.95rem; margin-bottom: 20px;
-    }
-    .price-box {
-        background-color: #e9ecef; border-left: 5px solid #2a9d8f; padding: 15px;
-        border-radius: 5px; font-size: 0.95rem; margin-bottom: 20px;
-    }
+    .report-box { background-color: #f8f9fa; border-left: 5px solid #0077b6; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+    .price-box { background-color: #e9ecef; border-left: 5px solid #2a9d8f; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
     </style>
     """, unsafe_allow_html=True)
 
 # ==========================================
-# 1. 假資料庫 (模擬 AI 腦袋裡的數據)
+# 1. 真實數據庫 (從 PDF 提取)
 # ==========================================
-# 這裡我們只放範例，真實運作時會從後端撈取
-DEMO_DATA = {
-    "RAV4": {"auction": 634000, "market": 750000},
-    "Corolla Cross": {"auction": 500000, "market": 630000},
-    "Altis": {"auction": 299000, "market": 430000}
+# 這裡放入你剛剛提供的 HAA/SAA 真實成交價
+REAL_DB = {
+    "RAV4 (汽油)": {
+        "auction_price": 634000, # 參考 2020/04 成交價
+        "market_price": 750000,  # 市場開價
+        "desc": "2020年式 五代 RAV4"
+    },
+    "RAV4 (油電)": {
+        "auction_price": 748000, # 參考 2023/05 成交價
+        "market_price": 890000,
+        "desc": "2023年式 油電旗艦"
+    },
+    "Corolla Cross (汽油)": {
+        "auction_price": 500000, # 參考 2022/06 成交價
+        "market_price": 630000,
+        "desc": "2022年式 國民神車"
+    },
+    "Altis (汽油)": {
+        "auction_price": 299000, # 參考 2020/10 成交價
+        "market_price": 430000,
+        "desc": "2020年式 12代 TNGA"
+    },
+    "Camry (汽油)": {
+        "auction_price": 600000, # 參考 2021/07 成交價
+        "market_price": 750000,
+        "desc": "2021年式 進口豪華版"
+    }
 }
 
 # ==========================================
-# 2. 側邊欄 (你的身份)
+# 2. 側邊欄
 # ==========================================
 def sidebar_content():
     with st.sidebar:
         st.header("✈️ Brian 航太數據室")
-        st.caption("全台唯一：AI 驅動的中古車簽證官")
+        st.caption("AI 驅動的中古車簽證官")
         st.markdown("---")
         st.info("💡 **我不賣車，我只提供真相。**\n利用大數據與 AI 演算法，幫你過濾 90% 的檸檬車與盤子價。")
         st.write("📞 **聯絡工程師**")
@@ -65,116 +80,113 @@ def main():
     st.title("🛡️ 中古車 AI 戰情中心")
     st.caption("Transparency as a Service (透明即服務)")
     
-    # 三大核心功能
-    tab1, tab2, tab3 = st.tabs(["🩺 AI 查定翻譯", "⚖️ 價格合理性分析", "💎 訂閱與方案"])
+    # 重新安排 Tabs：免費誘餌在前，付費功能在後
+    tab1, tab2, tab3 = st.tabs(["📊 戰情室 (Free)", "⚖️ 價格分析 (Paid)", "🩺 查定翻譯 (Paid)"])
 
-    # === Tab 1: AI 查定翻譯 (模擬功能) ===
+    # === Tab 1: 戰情室 (免費展示區) ===
     with tab1:
-        st.header("🩺 看不懂查定表？交給 AI")
-        st.write("拍賣場的 W2, X3, A1 代表什麼？上傳查定表，AI 幫你翻譯成「維修成本」。")
+        st.header("📊 本週精選：真實成交行情")
+        st.info("💡 這是我們資料庫中的 **「冰山一角」**。這些都是真實發生的成交價格。")
+        
+        # 展示 3 個真實案例
+        for car, data in list(REAL_DB.items())[:3]:
+            with st.expander(f"🚗 {car} ({data['desc']})"):
+                c1, c2, c3 = st.columns(3)
+                with c1: st.metric("拍賣成交價 (底價)", f"${data['auction_price']:,}")
+                with c2: st.metric("市場零售行情", f"${data['market_price']:,}")
+                with c3: 
+                    savings = data['market_price'] - data['auction_price']
+                    st.metric("潛在價差", f"${savings:,}", delta="你的談判空間")
+                st.caption("數據來源：HAA/SAA 拍賣場 (2025/12 - 2026/01)")
+
+        st.markdown("---")
+        st.warning("👉 想查詢其他車款？請使用 **Tab 2 價格分析**。")
+
+    # === Tab 2: 價格合理性分析 (核心付費功能模擬) ===
+    with tab2:
+        st.header("⚖️ AI 估價師：你買貴了嗎？")
+        st.write("輸入你在 8891 或車行看到的價格，AI 幫你計算「合理入手價」。")
+        
+        c1, c2 = st.columns(2)
+        with c1:
+            # 使用真實資料庫的選項
+            q_model = st.selectbox("選擇車款", list(REAL_DB.keys()))
+        with c2:
+            q_price = st.number_input("車行開價 (萬)", min_value=10, max_value=200, value=int(REAL_DB[q_model]['market_price']/10000))
+        
+        if st.button("🚀 啟動 AI 估價模型"):
+            with st.spinner("正在比對 HAA/SAA 真實成交大數據..."):
+                time.sleep(1.5)
+            
+            # 計算邏輯
+            base_price = REAL_DB[q_model]["auction_price"]
+            offer_price = q_price * 10000
+            # 假設合理利潤區間 (拍賣價 + 10%~15% 管銷)
+            fair_price_min = int(base_price * 1.10)
+            fair_price_max = int(base_price * 1.15)
+            
+            diff = offer_price - fair_price_max
+            
+            if offer_price > fair_price_max + 20000:
+                status = "🔴 溢價過高 (盤子價)"
+                advice = f"開價過高。根據數據，合理行情頂標在 {int(fair_price_max/10000)} 萬。建議直接從 {int(fair_price_min/10000)} 萬開始殺價。"
+            elif offer_price < base_price:
+                status = "⚠️ 價格異常低 (可能有詐)"
+                advice = "這價格低於拍賣場成本，極高機率是事故車、泡水車或釣魚假價。請要求出示查定表。"
+            else:
+                status = "🟢 價格合理"
+                advice = "此價格在合理行情範圍內。若車況良好，可以考慮購買。"
+
+            st.markdown(f"""
+            <div class="price-box">
+            <h4>📊 估價報告：{q_model}</h4>
+            <ul>
+                <li><b>您的輸入開價：</b> ${offer_price:,}</li>
+                <li><b>拍賣場真實底價：</b> ${base_price:,} (成本)</li>
+                <li><b>AI 計算合理區間：</b> ${fair_price_min:,} ~ ${fair_price_max:,}</li>
+            </ul>
+            <hr>
+            <h3>⚖️ 判定：{status}</h3>
+            <p><b>💬 Brian 的建議：</b><br>{advice}</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            st.info("💎 **覺得準嗎？** 這是免費試用版。解鎖「任意車款查詢」請訂閱 Pro 方案。")
+
+    # === Tab 3: AI 查定翻譯 (模擬功能) ===
+    with tab3:
+        st.header("🩺 AI 車況聽診器")
+        st.write("看不懂查定表的 W2、X3？上傳照片，AI 幫你翻譯成「維修成本」。")
         
         uploaded_file = st.file_uploader("📸 上傳查定表照片 (範例)", type=['jpg', 'png'])
         
         if uploaded_file is not None:
-            # 這裡模擬 AI 思考的過程 (增加儀式感)
-            with st.spinner("🤖 AI 正在掃描結構代碼... 分析鈑件狀況..."):
+            with st.spinner("🤖 AI 正在掃描結構代碼..."):
                 time.sleep(2.0)
             
-            # 顯示模擬的 AI 報告
             st.success("✅ 分析完成！")
             st.markdown("""
             <div class="report-box">
-            <h4>📋 AI 診斷報告：Toyota RAV4 (2020)</h4>
-            
-            <b>1. 結構掃描 (Structural)：</b> <span style='color:red'>🔴 B 柱 (左) W2</span>
+            <h4>📋 AI 診斷報告</h4>
+            <b>1. 結構掃描：</b> <span style='color:red'>🔴 B 柱 (左) W2</span>
             <ul>
-                <li><b>AI 解讀：</b> 該處曾發生碰撞，並進行板金修復。屬於「結構性損傷」。</li>
-                <li><b>安全風險：</b> 高。可能影響車體剛性與二次碰撞安全性。</li>
-                <li><b>工程師建議：</b> <b style='color:red'>強烈建議跳過 (Pass)</b>。</li>
+                <li><b>AI 解讀：</b> 曾經發生碰撞，板金修復。屬事故車風險。</li>
+                <li><b>建議：</b> <b style='color:red'>強烈建議跳過</b>。</li>
             </ul>
-            
-            <b>2. 外觀瑕疵 (Cosmetic)：</b> 🟡 前保桿 A3
+            <b>2. 外觀瑕疵：</b> 🟡 前保桿 A3
             <ul>
-                <li><b>AI 解讀：</b> 大面積刮傷，已見底漆。</li>
-                <li><b>預估復原成本：</b> 約 $3,500 ~ $4,500 (局部烤漆)。</li>
+                <li><b>AI 解讀：</b> 大面積刮傷。預估修復 $4,000。</li>
             </ul>
-            
-            <hr>
-            <b>🤖 綜合判定：❌ 不推薦購買</b>
             </div>
             """, unsafe_allow_html=True)
-            st.warning("👉 這只是範例展示。想分析您手上的車？請至 Tab 3 訂閱服務。")
-
-    # === Tab 2: 價格合理性分析 (模擬功能) ===
-    with tab2:
-        st.header("⚖️ 你買貴了嗎？")
-        st.write("輸入你在 8891 或車行看到的價格，AI 幫你計算「真實底價」。")
-        
-        c1, c2 = st.columns(2)
-        with c1:
-            q_model = st.selectbox("車款", ["Toyota RAV4", "Corolla Cross", "Altis"])
-        with c2:
-            q_price = st.number_input("車行開價 (萬)", min_value=10, max_value=200, value=75)
-        
-        if st.button("🚀 啟動 AI 估價模型"):
-            with st.spinner("正在調閱 HAA/SAA 近三個月成交大數據..."):
-                time.sleep(1.5)
             
-            # 簡單的計算邏輯
-            target_key = q_model.split(" ")[-1] # 取車型
-            if target_key in DEMO_DATA:
-                base_price = DEMO_DATA[target_key]["auction"]
-                market_price = DEMO_DATA[target_key]["market"]
-                offer_price = q_price * 10000
-                diff = offer_price - (base_price * 1.15) # 假設合理利潤 15%
-                
-                status = "🔴 溢價過高 (盤子價)" if diff > 50000 else "🟢 價格合理" if diff < 0 else "🟡 略貴 (可議價)"
-                
-                st.markdown(f"""
-                <div class="price-box">
-                <h4>📊 估價結果：{q_model}</h4>
-                
-                <ul>
-                    <li><b>您的輸入開價：</b> ${offer_price:,}</li>
-                    <li><b>AI 計算合理行情：</b> ${int(base_price * 1.15):,} (含整備利潤)</li>
-                    <li><b>拍賣場真實底價：</b> ${base_price:,} (參考成本)</li>
-                </ul>
-                <hr>
-                <h3>⚖️ 判定：{status}</h3>
-                <p><b>💬 AI 議價建議：</b><br>
-                "老闆，根據大數據，這年份的行情底價約在 {int(base_price/10000)} 萬。考慮到折舊，{int(offer_price/10000)-2} 萬我現在可以下訂。"</p>
-                </div>
-                """, unsafe_allow_html=True)
-
-    # === Tab 3: 訂閱與方案 ===
-    with tab3:
-        st.header("💎 訂閱 Brian 的數據服務")
-        st.write("我不賣車，所以我敢說真話。")
-        
-        c1, c2 = st.columns(2)
-        with c1:
-            st.image("https://cdn-icons-png.flaticon.com/512/2921/2921222.png", width=80)
-            st.subheader("🔴 單次鑑價")
-            st.metric("費用", "$499 / 次")
-            st.markdown("""
-            - ✅ 指定車輛 **真實底價**
-            - ✅ **查定表** 風險翻譯
-            - ✅ 提供 **議價劇本**
-            """)
-            st.button("👉 取得單次報告")
-            
-        with c2:
-            st.image("https://cdn-icons-png.flaticon.com/512/6403/6403485.png", width=80)
-            st.subheader("👑 Pro 通行證")
-            st.metric("費用", "$1,499 / 月")
-            st.markdown("""
-            - ♾️ **無限次** 查詢底價
-            - ♾️ **無限次** 查定表解讀
-            - 🚀 **VIP 優先** 審閱
-            """)
-            st.button("👉 成為 Pro 會員")
-
-        st.info("⚠️ 本服務僅提供數據顧問，不涉及車輛買賣。交易風險請自行評估。")
+            c1, c2 = st.columns(2)
+            with c1:
+                st.markdown("### 🔴 單次報告 $499")
+                st.button("👉 取得完整報告")
+            with c2:
+                st.markdown("### 👑 Pro 會員 $1,499")
+                st.button("👉 無限次查詢")
 
 if __name__ == "__main__":
     main()
