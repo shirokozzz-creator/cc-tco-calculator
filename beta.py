@@ -1,52 +1,145 @@
 import streamlit as st
-import pandas as pd
-import time
 import google.generativeai as genai
-from PIL import Image
+import pandas as pd
+import numpy as np
+import time
 
-# 0. 設定頁面
-st.set_page_config(page_title="Brian 航太數據室 | 真實 AI 掃描", page_icon="✈️")
+# ==========================================
+# 0. 核心設定
+# ==========================================
+st.set_page_config(page_title="RAV4 世代戰情室 | 流量密碼生成器", page_icon="🚙", layout="centered")
 
-# 1. 側邊欄：輸入鑰匙的地方
-def sidebar_content():
-    with st.sidebar:
-        st.header("✈️ 設定控制台")
-        # 這裡做一個輸入框，讓你貼上 API Key
-        api_key = st.text_input("🔑 輸入 Google Gemini API Key", type="password")
-        st.info("💡 請去 Google AI Studio 申請免費 Key")
-        return api_key
+st.markdown("""
+    <style>
+    .big-stat { font-size: 2em; font-weight: bold; }
+    .vs-box { background-color: #f0f2f6; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
+    .script-box { background-color: #e3f2fd; padding: 20px; border-left: 5px solid #2196f3; font-family: "Microsoft JhengHei"; }
+    .stButton>button { width: 100%; border-radius: 8px; background-color: #d32f2f; color: white; font-weight: bold; }
+    </style>
+    """, unsafe_allow_html=True)
 
-# 2. AI 核心：呼叫 Google 大腦
-def analyze_image_with_gemini(api_key, image, prompt):
+# ==========================================
+# 1. 邏輯核心
+# ==========================================
+def calculate_dilemma(gen5_price, gen6_est_price, wait_months):
+    # 簡單的數學邏輯：早買早享受 vs 晚買享折扣(或漲價)
+    price_diff = gen6_est_price - gen5_price
+    
+    # 假設現在買 5 代，開 5 年後的折舊 (末代車折舊較高)
+    gen5_depreciation = gen5_price * 0.45 
+    # 假設等 6 代，開 5 年後的折舊 (新世代折舊較低)
+    gen6_depreciation = gen6_est_price * 0.35 
+    
+    # 時間成本 (假設一個月用車價值 1.5 萬)
+    time_cost = wait_months * 1.5
+    
+    return price_diff, gen5_depreciation, gen6_depreciation, time_cost
+
+def generate_video_script(api_key, gen5_price, gen6_est_price, wait_months, verdict):
+    genai.configure(api_key=api_key)
     try:
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-1.5-flash') 
-        with st.spinner("🤖 正在連線 Google 大腦..."):
-            response = model.generate_content([prompt, image])
-            return response.text
-    except Exception as e:
-        return f"❌ 錯誤：{str(e)}"
-
-# 3. 主程式
-def main():
-    user_api_key =AIzaSyDAJTvNaBDz7xtwcsI_TcpIkK9njco5B7M() # 取得你在側邊欄輸入的 Key
-    st.title("🛡️ 真・AI 車況審計師")
-    st.markdown("請上傳圖片，AI 會真的幫你看圖！")
-
-    uploaded_file = st.file_uploader("📸 上傳圖片", type=['jpg', 'png', 'jpeg'])
-    
-    if uploaded_file and user_api_key:
-        image = Image.open(uploaded_file)
-        st.image(image, width=300)
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        prompt = f"""
+        你現在是汽車自媒體創作者 Brian。請寫一個 30 秒的短影音腳本 (Tiktok/Reels 風格)。
+        主題：到底該抄底買 RAV4 5代，還是等 6代？
         
-        if st.button("🚀 啟動真實 AI 分析"):
-            prompt = "你是一位專業車商。請告訴我這張圖片裡的車是什麼型號？有沒有明顯外觀瑕疵？它是高配還是低配？"
-            result = analyze_image_with_gemini(user_api_key, image, prompt)
-            st.success("分析完成！")
-            st.write(result)
+        數據：
+        - 5代現在買只要：{gen5_price} 萬 (末代優惠)
+        - 6代預估售價：{gen6_est_price} 萬 (漲價)
+        - 需等待時間：{wait_months} 個月
+        - AI 結論：{verdict}
+        
+        腳本結構：
+        1. 鉤子 (0-3秒)：用一句話抓住想買 RAV4 的人。
+        2. 痛點 (3-15秒)：分析價差和等待成本。
+        3. 爆點 (15-25秒)：揭露 AI 算出來的真相 (TCO)。
+        4. 結尾 (25-30秒)：引導留言 (例如：想知道 6 代詳細規格？留言『想知道』)。
+        
+        語氣：犀利、快節奏、揭密感。
+        """
+        response = model.generate_content(prompt)
+        return response.text
+    except:
+        return "⚠️ AI 連線忙碌中，請稍後再試。"
+
+# ==========================================
+# 2. UI 介面
+# ==========================================
+def main():
+    with st.sidebar:
+        st.header("⚙️ 參數設定")
+        if "GOOGLE_API_KEY" in st.secrets:
+            api_key = st.secrets["GOOGLE_API_KEY"]
+        else:
+            api_key = st.text_input("Google API Key", type="password")
+            
+        st.markdown("---")
+        st.caption("設定你的預測模型")
+        
+        # 使用者可以調整這些參數來拍片
+        gen5_price = st.number_input("5代 RAV4 成交價 (萬)", 90, 140, 110)
+        gen6_est_price = st.slider("預估 6代 上市價 (萬)", 110, 180, 135)
+        wait_months = st.slider("預估等待月數", 1, 24, 12)
+
+    st.title("🚙 RAV4 世代大對決 (5代 vs 6代)")
+    st.markdown("### 拍片主題：現在抄底 5 代，還是苦等 6 代？")
+
+    # 1. 視覺化對決 (Visual Impact)
+    col1, col2 = st.columns(2)
+    with col1:
+        st.info("📉 **5代 (末代王者)**")
+        st.metric("目前行情", f"{gen5_price} 萬", "優惠折價中")
+        st.caption("優勢：便宜、穩定、不用等")
+        
+    with col2:
+        st.error("🚀 **6代 (未來戰士)**")
+        st.metric("預估售價", f"{gen6_est_price} 萬", f"漲 {gen6_est_price - gen5_price} 萬", delta_color="inverse")
+        st.caption("優勢：新底盤、新油電、更帥")
+
+    # 2. 計算結果
+    price_diff, gen5_dep, gen6_dep, time_cost = calculate_dilemma(gen5_price, gen6_est_price, wait_months)
     
-    elif uploaded_file and not user_api_key:
-        st.warning("⚠️ 請在左邊側邊欄貼上 API Key 喔！")
+    # 判斷邏輯
+    total_cost_wait = (gen6_est_price - gen5_price) + time_cost
+    if total_cost_wait > 30: 
+        verdict = "現在買 5 代！這價差太大了，等 6 代是盤子。"
+        verdict_color = "green"
+    else:
+        verdict = "絕對要等 6 代！5 代買了就變舊世代，虧死。"
+        verdict_color = "red"
+
+    st.markdown("---")
+    st.subheader("📊 AI 殘酷試算 (TCO 分析)")
+    
+    st.markdown(f"""
+    <div class='vs-box'>
+        <h4>💰 為了等 6 代，你的隱形成本：</h4>
+        <ul>
+            <li><b>車價漲幅：</b>多付 <span style='color:red; font-weight:bold'>{int(price_diff)} 萬</span></li>
+            <li><b>無車可用 {wait_months} 個月：</b>價值損失約 <span style='color:red; font-weight:bold'>{int(time_cost)} 萬</span> (租車/計程車費)</li>
+            <li><b>總結代價：</b><span style='font-size:1.5em; font-weight:bold'>為了開新款，你要多噴 {int(total_cost_wait)} 萬！</span></li>
+        </ul>
+    </div>
+    """, unsafe_allow_html=True)
+
+    if verdict_color == "green":
+        st.success(f"🏆 **AI 結論：{verdict}**")
+    else:
+        st.error(f"🏆 **AI 結論：{verdict}**")
+
+    # 3. 生成腳本
+    st.markdown("---")
+    st.subheader("🎥 短影音腳本生成 (一鍵開拍)")
+    
+    if st.button("🎬 生成 Brian 的爆款腳本"):
+        if not api_key:
+            st.warning("請輸入 API Key")
+        else:
+            with st.spinner("🤖 馬斯克正在幫你想台詞..."):
+                time.sleep(1)
+                script = generate_video_script(api_key, gen5_price, gen6_est_price, wait_months, verdict)
+                st.markdown(f"""<div class='script-box'>{script.replace(chr(10), '<br>')}</div>""", unsafe_allow_html=True)
+                st.caption("💡 拍攝技巧：手機開啟錄影，切換前後鏡頭，手指著上面的數據念這段稿。")
 
 if __name__ == "__main__":
     main()
