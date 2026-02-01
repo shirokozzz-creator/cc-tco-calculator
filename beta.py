@@ -5,15 +5,31 @@ import numpy as np
 import time
 
 # ==========================================
-# 0. 核心設定
+# 0. 核心設定 (已修復深色模式 Bug)
 # ==========================================
 st.set_page_config(page_title="RAV4 世代戰情室 | 流量密碼生成器", page_icon="🚙", layout="centered")
 
 st.markdown("""
     <style>
     .big-stat { font-size: 2em; font-weight: bold; }
-    .vs-box { background-color: #f0f2f6; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
-    .script-box { background-color: #e3f2fd; padding: 20px; border-left: 5px solid #2196f3; font-family: "Microsoft JhengHei"; }
+    
+    /* 修復重點：加入 color: #333333; 強制字體變深色 */
+    .vs-box { 
+        background-color: #f0f2f6; 
+        padding: 20px; 
+        border-radius: 10px; 
+        margin-bottom: 20px; 
+        color: #333333; 
+    }
+    
+    .script-box { 
+        background-color: #e3f2fd; 
+        padding: 20px; 
+        border-left: 5px solid #2196f3; 
+        font-family: "Microsoft JhengHei";
+        color: #333333; /* 強制深色字 */
+    }
+    
     .stButton>button { width: 100%; border-radius: 8px; background-color: #d32f2f; color: white; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
@@ -22,18 +38,11 @@ st.markdown("""
 # 1. 邏輯核心
 # ==========================================
 def calculate_dilemma(gen5_price, gen6_est_price, wait_months):
-    # 簡單的數學邏輯：早買早享受 vs 晚買享折扣(或漲價)
+    # 簡單的數學邏輯
     price_diff = gen6_est_price - gen5_price
+    time_cost = wait_months * 1.5 # 假設一個月用車價值 1.5 萬
     
-    # 假設現在買 5 代，開 5 年後的折舊 (末代車折舊較高)
-    gen5_depreciation = gen5_price * 0.45 
-    # 假設等 6 代，開 5 年後的折舊 (新世代折舊較低)
-    gen6_depreciation = gen6_est_price * 0.35 
-    
-    # 時間成本 (假設一個月用車價值 1.5 萬)
-    time_cost = wait_months * 1.5
-    
-    return price_diff, gen5_depreciation, gen6_depreciation, time_cost
+    return price_diff, time_cost
 
 def generate_video_script(api_key, gen5_price, gen6_est_price, wait_months, verdict):
     genai.configure(api_key=api_key)
@@ -66,41 +75,43 @@ def generate_video_script(api_key, gen5_price, gen6_est_price, wait_months, verd
 # 2. UI 介面
 # ==========================================
 def main():
+    # 嘗試從 Secrets 讀取 Key，如果沒有就顯示輸入框
+    if "GOOGLE_API_KEY" in st.secrets:
+        api_key = st.secrets["GOOGLE_API_KEY"]
+        key_status = "✅ AI 已連線"
+    else:
+        api_key = None
+        key_status = "⚠️ 未連線"
+
     with st.sidebar:
-        st.header("⚙️ 參數設定")
-        if "GOOGLE_API_KEY" in st.secrets:
-            api_key = st.secrets["GOOGLE_API_KEY"]
-        else:
+        st.header(f"⚙️ 設定 ({key_status})")
+        if not api_key:
             api_key = st.text_input("Google API Key", type="password")
             
         st.markdown("---")
         st.caption("設定你的預測模型")
         
-        # 使用者可以調整這些參數來拍片
         gen5_price = st.number_input("5代 RAV4 成交價 (萬)", 90, 140, 110)
         gen6_est_price = st.slider("預估 6代 上市價 (萬)", 110, 180, 135)
-        wait_months = st.slider("預估等待月數", 1, 24, 12)
+        wait_months = st.slider("預估等待月數", 1, 24, 6)
 
     st.title("🚙 RAV4 世代大對決 (5代 vs 6代)")
     st.markdown("### 拍片主題：現在抄底 5 代，還是苦等 6 代？")
 
-    # 1. 視覺化對決 (Visual Impact)
+    # 1. 視覺化對決
     col1, col2 = st.columns(2)
     with col1:
         st.info("📉 **5代 (末代王者)**")
         st.metric("目前行情", f"{gen5_price} 萬", "優惠折價中")
-        st.caption("優勢：便宜、穩定、不用等")
         
     with col2:
         st.error("🚀 **6代 (未來戰士)**")
         st.metric("預估售價", f"{gen6_est_price} 萬", f"漲 {gen6_est_price - gen5_price} 萬", delta_color="inverse")
-        st.caption("優勢：新底盤、新油電、更帥")
 
     # 2. 計算結果
-    price_diff, gen5_dep, gen6_dep, time_cost = calculate_dilemma(gen5_price, gen6_est_price, wait_months)
-    
-    # 判斷邏輯
+    price_diff, time_cost = calculate_dilemma(gen5_price, gen6_est_price, wait_months)
     total_cost_wait = (gen6_est_price - gen5_price) + time_cost
+    
     if total_cost_wait > 30: 
         verdict = "現在買 5 代！這價差太大了，等 6 代是盤子。"
         verdict_color = "green"
@@ -111,6 +122,7 @@ def main():
     st.markdown("---")
     st.subheader("📊 AI 殘酷試算 (TCO 分析)")
     
+    # 這裡就是會顯示文字的框框
     st.markdown(f"""
     <div class='vs-box'>
         <h4>💰 為了等 6 代，你的隱形成本：</h4>
@@ -133,7 +145,7 @@ def main():
     
     if st.button("🎬 生成 Brian 的爆款腳本"):
         if not api_key:
-            st.warning("請輸入 API Key")
+            st.warning("請先在左側輸入 API Key")
         else:
             with st.spinner("🤖 馬斯克正在幫你想台詞..."):
                 time.sleep(1)
