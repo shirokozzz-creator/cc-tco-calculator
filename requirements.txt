@@ -3,3 +3,6 @@ pandas
 fpdf2
 requests
 plotly
+google-generativeai
+numpy
+Pillow
