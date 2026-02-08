@@ -51,20 +51,47 @@ def page_toyota_tco():
         }
     }
 
-    # --- 2. 航太級 FMEA 通病數據庫 (NEW!) ---
-    # 這裡定義通病、發生機率、維修成本
+    # --- 2. 航太級 FMEA 數據庫 (嚴謹版) ---
+    # S(嚴重度): 1-10, O(發生度): 1-10, D(難檢度): 1-10
+    # RPN = S * O * D (工程師判定優先級的依據)
     car_fmea = {
         "Corolla Cross": [
-            {"part": "車頂架漏水 (Roof Leak)", "prob": 0.30, "cost": 5000, "type": "both", "impact": "高 (內裝發霉)"},
-            {"part": "CVT 變速箱頓挫", "prob": 0.15, "cost": 0, "type": "gas", "impact": "中 (駕駛體感)"}
+            {
+                "years": "2020~2022",
+                "part": "車頂架密封失效 (Roof Rail Seal)",
+                "s": 7, "o": 4, "d": 2,  # RPN = 56
+                "cost": 6500,
+                "eng_note": "應力集中導致防水墊片形變，引發流體滲漏風險。過往 MTBF 數據顯示於 3-5 年發生週期。",
+                "target": "both"
+            },
+            {
+                "years": "2020~2024",
+                "part": "K120 CVT 銜接感 (Gear Shudder)",
+                "s": 3, "o": 2, "d": 1,  # RPN = 6 (發生機率修正為 2-5%)
+                "cost": 85000, 
+                "eng_note": "Direct Shift CVT 啟動齒輪切換至鋼帶之過渡特性。非結構性失效，僅為系統銜接感。若需更換總成成本極高。",
+                "target": "gas"
+            }
         ],
         "RAV4": [
-            {"part": "車頂架漏水 (Roof Leak)", "prob": 0.40, "cost": 8000, "type": "both", "impact": "高 (天篷水痕)"},
-            {"part": "高壓電纜鏽蝕 (HV Cable)", "prob": 0.20, "cost": 60000, "type": "hybrid", "impact": "極高 (顧路風險)"}
+            {
+                "years": "2019~2021",
+                "part": "車頂架漏水 (Roof Leakage)",
+                "s": 7, "o": 5, "d": 2,  # RPN = 70
+                "cost": 8000,
+                "eng_note": "固定扣具密封圈疲勞失效，導致水分侵入 A/B 柱氣囊區域。建議執行預防性更換改良型零件。",
+                "target": "both"
+            },
+            {
+                "years": "2019~2022",
+                "part": "HV 高壓電纜接頭腐蝕 (Hybrid Cable)",
+                "s": 9, "o": 3, "d": 8,  # RPN = 216 (難檢度極高)
+                "cost": 65000,
+                "eng_note": "暴露於潮濕環境引發電化學腐蝕，導致接頭阻抗過大。失效時會觸發系統強迫停機 (AOG 狀態)。",
+                "target": "hybrid"
+            }
         ]
     }
-
-    if 'submitted' not in st.session_state: st.session_state.submitted = False
 
     # --- 側邊欄參數 ---
     st.sidebar.header("⚙️ Toyota 參數設定")
