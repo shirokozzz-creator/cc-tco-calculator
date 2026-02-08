@@ -8,28 +8,30 @@ import csv
 from datetime import datetime
 
 # ==========================================
-# 0. 全域設定
+# 0. 全域設定 (必須放在第一行)
 # ==========================================
 st.set_page_config(page_title="Brian 的航太級車況實驗室", page_icon="✈️", layout="wide")
 
 # ==========================================
-# 🛠️ 共用工具函式 (存名單用)
+# 🛠️ 共用工具函式 (存名單用 - 防彈版)
 # ==========================================
 def save_lead(email, model, note="Waitlist"):
     file_name = "leads_v2.csv"
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
+    # 如果檔案不存在，先建立標題列
     if not os.path.exists(file_name):
         with open(file_name, "w", newline="", encoding='utf-8-sig') as f:
             writer = csv.writer(f)
             writer.writerow(["Time", "Model", "Email", "Status", "Note"])
             
+    # 寫入資料
     with open(file_name, "a", newline="", encoding='utf-8-sig') as f:
         writer = csv.writer(f)
         writer.writerow([timestamp, model, email, "Waitlist", note])
 
 # ==========================================
-# 🚗 功能 A：Toyota TCO 精算機 (含 FMEA 升級版)
+# 🚗 功能 A：Toyota TCO 精算機 (含航太 FMEA)
 # ==========================================
 def page_toyota_tco():
     # --- 1. 基礎數據庫 ---
@@ -53,45 +55,40 @@ def page_toyota_tco():
 
     # --- 2. 航太級 FMEA 數據庫 (嚴謹版) ---
     # S(嚴重度): 1-10, O(發生度): 1-10, D(難檢度): 1-10
-    # RPN = S * O * D (工程師判定優先級的依據)
+    # RPN = S * O * D
     car_fmea = {
         "Corolla Cross": [
             {
-                "years": "2020~2022",
+                "years": "2020~2022", 
                 "part": "車頂架密封失效 (Roof Rail Seal)",
-                "s": 7, "o": 4, "d": 2,  # RPN = 56
-                "cost": 6500,
-                "eng_note": "應力集中導致防水墊片形變，引發流體滲漏風險。過往 MTBF 數據顯示於 3-5 年發生週期。",
-                "target": "both"
+                "s": 7, "o": 3, "d": 2, "cost": 6500, "target": "both",
+                "eng_note": "【技術鑑定】應力集中導致防水墊片形變，引發流體滲漏風險。過往 MTBF 數據顯示於 3-5 年發生週期。"
             },
             {
-                "years": "2020~2024",
+                "years": "2020~2024", 
                 "part": "K120 CVT 銜接感 (Gear Shudder)",
-                "s": 3, "o": 2, "d": 1,  # RPN = 6 (發生機率修正為 2-5%)
-                "cost": 85000, 
-                "eng_note": "Direct Shift CVT 啟動齒輪切換至鋼帶之過渡特性。非結構性失效，僅為系統銜接感。若需更換總成成本極高。",
-                "target": "gas"
+                # 修正：發生度(O)降為 2 (約 1-3% 機率)，符合嚴謹數據
+                "s": 3, "o": 2, "d": 1, "cost": 85000, "target": "gas",
+                "eng_note": "【技術鑑定】Direct Shift CVT 啟動齒輪切換至鋼帶之過渡特性。非結構性失效，僅為系統銜接感。"
             }
         ],
         "RAV4": [
             {
-                "years": "2019~2021",
+                "years": "2019~2021", 
                 "part": "車頂架漏水 (Roof Leakage)",
-                "s": 7, "o": 5, "d": 2,  # RPN = 70
-                "cost": 8000,
-                "eng_note": "固定扣具密封圈疲勞失效，導致水分侵入 A/B 柱氣囊區域。建議執行預防性更換改良型零件。",
-                "target": "both"
+                "s": 7, "o": 4, "d": 2, "cost": 8000, "target": "both",
+                "eng_note": "【技術鑑定】固定扣具密封圈疲勞失效，導致水分侵入 A/B 柱氣囊區域。建議執行預防性更換改良型零件。"
             },
             {
-                "years": "2019~2022",
+                "years": "2019~2022", 
                 "part": "HV 高壓電纜接頭腐蝕 (Hybrid Cable)",
-                "s": 9, "o": 3, "d": 8,  # RPN = 216 (難檢度極高)
-                "cost": 65000,
-                "eng_note": "暴露於潮濕環境引發電化學腐蝕，導致接頭阻抗過大。失效時會觸發系統強迫停機 (AOG 狀態)。",
-                "target": "hybrid"
+                "s": 9, "o": 3, "d": 8, "cost": 65000, "target": "hybrid",
+                "eng_note": "【技術鑑定】暴露於潮濕環境引發電化學腐蝕，導致接頭阻抗過大。失效時會觸發系統強迫停機 (AOG 狀態)。"
             }
         ]
     }
+
+    if 'submitted' not in st.session_state: st.session_state.submitted = False
 
     # --- 側邊欄參數 ---
     st.sidebar.header("⚙️ Toyota 參數設定")
@@ -108,7 +105,7 @@ def page_toyota_tco():
     st.sidebar.markdown("---")
     force_risk = st.sidebar.checkbox("🚨 加入 FMEA 通病風險成本", value=True, help="依據航太 FMEA 邏輯，將通病發生機率 x 維修金額加入成本計算")
 
-    # --- 管理員後台 (保持原樣) ---
+    # --- 管理員後台 ---
     with st.sidebar.expander("🕵️‍♂️ 管理員後台"):
         admin_pwd = st.text_input("輸入密碼", type="password", key="admin_check")
         target_file = "leads_v2.csv"
@@ -126,51 +123,44 @@ def page_toyota_tco():
     st.title(f"✈️ 航太工程師的 {selected_model} 購車精算機")
     st.caption("運用航太級 TCO 模型，幫您算出符合數學邏輯的最佳選擇。")
 
-    if selected_model in car_fmea:
-        with st.expander("🛠️ 內部檢視：航太級 FMEA 失效模式分析 (Engineering Only)", expanded=True):
-            st.markdown("針對此車型之 **RPN (風險優先數)** 鑑定如下：")
-            
-            for issue in car_fmea[selected_model]:
-                rpn = issue['s'] * issue['o'] * issue['d']
-                st.error(f"**項目：{issue['part']} ({issue['years']})**")
-                # 這裡就是顯示專業備註的地方
-                st.info(f"🧬 {issue['eng_note']}")
-                st.markdown(f"* **RPN 指數**: {rpn} (發生度 O: {issue['o']}/10) | **預估維修**: ${issue['cost']:,}")
-                st.divider()
-    # --- 🔥 FMEA 通病雷達區塊 (新功能) ---
+    # --- 🔥 FMEA 通病雷達區塊 (航太工程師版) ---
     fmea_cost_gas = 0
     fmea_cost_hybrid = 0
 
     if selected_model in car_fmea:
-        with st.expander(f"🚨 注意！{selected_model} 航太級 FMEA 通病偵測", expanded=True):
-            st.markdown(f"**根據大數據與維修案例，此車型有以下潛在風險 (RPN 分析)：**")
-            cols = st.columns(len(car_fmea[selected_model]))
+        # 這裡將標題改得更專業，並預設展開
+        with st.expander(f"🛠️ 內部檢視：航太級 FMEA 失效模式分析 (Engineering Only)", expanded=True):
+            st.markdown("針對此車型之 **RPN (風險優先數)** 鑑定如下：")
             
-            for idx, issue in enumerate(car_fmea[selected_model]):
-                # 計算期望風險成本 = 機率 * 成本
-                expected_cost = int(issue['prob'] * issue['cost'])
+            # 使用兩欄排列，左邊顯示通病，右邊顯示詳細數據
+            for issue in car_fmea[selected_model]:
+                # 計算 RPN
+                rpn = issue['s'] * issue['o'] * issue['d']
                 
-                # 累加成本
-                if issue['type'] == 'both':
+                # 計算期望風險成本 (加入總成本用)
+                expected_cost = int(issue['cost'] * (issue['o'] / 10.0)) # 簡易機率權重
+                
+                # 累加成本邏輯
+                if issue['target'] == 'both':
                     fmea_cost_gas += expected_cost
                     fmea_cost_hybrid += expected_cost
-                elif issue['type'] == 'gas':
+                elif issue['target'] == 'gas':
                     fmea_cost_gas += expected_cost
-                elif issue['type'] == 'hybrid':
+                elif issue['target'] == 'hybrid':
                     fmea_cost_hybrid += expected_cost
 
-                with cols[idx]:
-                    st.error(f"⚠️ {issue['part']}")
-                    st.markdown(f"""
-                    - **發生機率**: {int(issue['prob']*100)}%
-                    - **單次維修**: ${issue['cost']:,}
-                    - **潛在影響**: {issue['impact']}
-                    """)
+                # 顯示區塊
+                st.error(f"**項目：{issue['part']} ({issue['years']})**")
+                st.info(f"🧬 {issue['eng_note']}") # 顯示中文工程備註
+                
+                col_a, col_b, col_c = st.columns(3)
+                col_a.metric("RPN 指數", rpn, help="嚴重度 x 發生度 x 難檢度")
+                col_b.metric("發生機率 (O)", f"{issue['o']}/10", help="1為極低，10為必然發生")
+                col_c.metric("預估維修", f"${issue['cost']:,}")
+                st.divider()
             
             if force_risk:
-                st.caption(f"💡 已將風險成本納入計算：汽油版 +${fmea_cost_gas:,} / 油電版 +${fmea_cost_hybrid:,}")
-            else:
-                st.caption("💡 勾選左側「加入 FMEA 通病風險成本」以查看真實持有成本。")
+                st.caption(f"💡 系統已根據 RPN 自動加權：汽油版 TCO +${fmea_cost_gas:,} / 油電版 TCO +${fmea_cost_hybrid:,}")
 
     # --- 計算邏輯 ---
     def get_resale_value(initial_price, year, car_type):
@@ -191,7 +181,8 @@ def page_toyota_tco():
         g_resale = get_resale_value(gas_car_price, y, 'gas')
         h_resale = get_resale_value(hybrid_car_price, y, 'hybrid')
         
-        # 成本計算 (加入 FMEA 成本，假設風險隨持有時間平均攤提或一次性發生，這裡簡化為一次性預備金)
+        # 成本計算 (加入 FMEA 成本)
+        # 假設通病風險隨著持有時間增加，這裡做一個簡單的線性累加模擬
         risk_g = fmea_cost_gas if (force_risk and y > 0) else 0
         risk_h = fmea_cost_hybrid if (force_risk and y > 0) else 0
 
@@ -235,7 +226,6 @@ def page_toyota_tco():
     # --- 戰情室 ---
     st.subheader("📊 決策戰情室")
     
-    # 判斷勝負
     if diff > 0:
         winner = "油電版"
         amount = int(diff)
@@ -246,11 +236,11 @@ def page_toyota_tco():
         st.info(f"🏆 **建議購買：{winner}！** 持有 {years_to_keep} 年省下 **${amount:,}**")
 
     col1, col2 = st.columns(2)
-    col1.metric("⛽ 汽油版總成本", f"${int(tco_gas):,}", delta=f"含 FMEA 風險: ${final_risk_g}" if final_risk_g > 0 else None, delta_color="inverse")
-    col2.metric("⚡ 油電版總成本", f"${int(tco_hybrid):,}", delta=f"含 FMEA 風險: ${final_risk_h}" if final_risk_h > 0 else None, delta_color="inverse")
+    col1.metric("⛽ 汽油版總成本", f"${int(tco_gas):,}", delta=f"含 RPN 風險: ${final_risk_g}" if final_risk_g > 0 else None, delta_color="inverse")
+    col2.metric("⚡ 油電版總成本", f"${int(tco_hybrid):,}", delta=f"含 RPN 風險: ${final_risk_h}" if final_risk_h > 0 else None, delta_color="inverse")
 
     # --- 圖表 ---
-    st.subheader(f"📈 {years_to_keep} 年持有成本曲線")
+    st.subheader(f"📈 {years_to_keep} 年持有成本曲線 (TCO)")
     base = alt.Chart(chart_df).encode(
         x=alt.X('年份', axis=alt.Axis(tickMinStep=1)), 
         y='累積花費', color=alt.Color('車型', scale=alt.Scale(domain=['汽油版', '油電版'], range=['#FF4B4B', '#0052CC']))
