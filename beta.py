@@ -31,7 +31,7 @@ def save_lead(email, model, note="Waitlist"):
         writer.writerow([timestamp, model, email, "Waitlist", note])
 
 # ==========================================
-# 🚗 功能 A：Toyota TCO 精算機 (含白話文警示)
+# 🚗 功能 A：Toyota TCO 精算機 (摺疊衝擊版)
 # ==========================================
 def page_toyota_tco():
     # --- 1. 基礎數據庫 ---
@@ -53,9 +53,7 @@ def page_toyota_tco():
         }
     }
 
-    # --- 2. 航太級 FMEA 數據庫 (嚴謹版) ---
-    # S(嚴重度): 1-10, O(發生度): 1-10, D(難檢度): 1-10
-    # check_guide: 給一般人看的「看車重點」
+    # --- 2. 航太級 FMEA 數據庫 ---
     car_fmea = {
         "Corolla Cross": [
             {
@@ -126,52 +124,54 @@ def page_toyota_tco():
     st.title(f"✈️ 航太工程師的 {selected_model} 購車精算機")
     st.caption("運用航太級 TCO 模型，幫您算出符合數學邏輯的最佳選擇。")
 
-    # --- 🔥 FMEA 通病雷達 (一般民眾白話版) ---
+    # --- 🔥 FMEA 通病雷達 (摺疊衝擊版) ---
     fmea_cost_gas = 0
     fmea_cost_hybrid = 0
 
     if selected_model in car_fmea:
-        st.subheader("🛑 購車前必看：潛在「隱形虧錢」風險")
-        st.info("根據航太維修數據分析，這年份的車可能有以下通病。買錯車，修車費可能吃掉你的油錢！")
+        # 計算一下總風險金額，放在標題吸引人點擊
+        total_risk_preview = 0
+        for i in car_fmea[selected_model]:
+            total_risk_preview += i['cost']
 
-        for issue in car_fmea[selected_model]:
-            # 計算 RPN 與 成本
-            rpn = issue['s'] * issue['o'] * issue['d']
-            # 這裡我們計算一個 "加權後" 的預期成本加入 TCO
-            expected_cost = int(issue['cost'] * (issue['o'] / 10.0))
+        # 這裡就是你要的「摺疊」效果，預設 expanded=False (關閉)
+        with st.expander(f"💣 【高風險預警】{selected_model} 潛在隱形虧損約 ${total_risk_preview:,} (點擊展開真相)", expanded=False):
             
-            # 累加成本邏輯
-            if issue['target'] == 'both':
-                fmea_cost_gas += expected_cost
-                fmea_cost_hybrid += expected_cost
-            elif issue['target'] == 'gas':
-                fmea_cost_gas += expected_cost
-            elif issue['target'] == 'hybrid':
-                fmea_cost_hybrid += expected_cost
+            st.info("💡 根據航太維修數據分析，這年份的車可能有以下通病。")
+            
+            for issue in car_fmea[selected_model]:
+                # 計算 RPN 與 成本
+                rpn = issue['s'] * issue['o'] * issue['d']
+                expected_cost = int(issue['cost'] * (issue['o'] / 10.0))
+                
+                if issue['target'] == 'both':
+                    fmea_cost_gas += expected_cost
+                    fmea_cost_hybrid += expected_cost
+                elif issue['target'] == 'gas':
+                    fmea_cost_gas += expected_cost
+                elif issue['target'] == 'hybrid':
+                    fmea_cost_hybrid += expected_cost
 
-            # 視覺化卡片設定
-            # 如果 RPN > 100 或者是高單價維修，用紅色警告
-            is_severe = rpn > 100 or issue['cost'] > 20000
-            border_color = "#FF4B4B" if is_severe else "#FFA500" # 紅色 vs 橘色
-            bg_color = "#FFE5E5" if is_severe else "#FFF8E1"
-            prob_display = issue['o'] * 10 # 轉換成體感百分比 (例如 2 -> 20%)
+                # 視覺化卡片
+                is_severe = rpn > 100 or issue['cost'] > 20000
+                border_color = "#FF4B4B" if is_severe else "#FFA500"
+                bg_color = "#FFE5E5" if is_severe else "#FFF8E1"
+                prob_display = issue['o'] * 10 
 
-            # 使用 HTML 渲染卡片
-            st.markdown(f"""
-            <div style="border: 2px solid {border_color}; border-radius: 10px; background-color: {bg_color}; padding: 15px; margin-bottom: 15px;">
-                <h3 style="color: {border_color}; margin-top: 0;">⚠️ 可能損失金額：${issue['cost']:,}</h3>
-                <p><b>📛 通病項目：</b>{issue['part']} (年份: {issue['years']})</p>
-                <p><b>📊 體感發生率：</b>約 {prob_display}% (中獎機率)</p>
-                <hr style="border-top: 1px dashed {border_color};">
-                <p style="color: #D32F2F; font-weight: bold;">🔍 航太工程師教你怎麼檢查：</p>
-                <p>{issue['check_guide']}</p>
-            </div>
-            """, unsafe_allow_html=True)
-
-        # 顯示內部的專業數據 (摺疊起來)
-        with st.expander("🛠️ 點此查看：航太工程師 FMEA 原始數據 (Engineering Data)"):
-            st.caption("以下數據供技術人員參考 (S=嚴重度, O=發生度, D=難檢度)")
-            st.table(pd.DataFrame(car_fmea[selected_model]).drop(columns=['check_guide']))
+                st.markdown(f"""
+                <div style="border: 2px solid {border_color}; border-radius: 10px; background-color: {bg_color}; padding: 15px; margin-bottom: 15px;">
+                    <h3 style="color: {border_color}; margin-top: 0;">⚠️ 可能損失金額：${issue['cost']:,}</h3>
+                    <p><b>📛 通病項目：</b>{issue['part']} (年份: {issue['years']})</p>
+                    <p><b>📊 體感發生率：</b>約 {prob_display}% (中獎機率)</p>
+                    <hr style="border-top: 1px dashed {border_color};">
+                    <p style="color: #D32F2F; font-weight: bold;">🔍 航太工程師教你怎麼檢查：</p>
+                    <p>{issue['check_guide']}</p>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            # 專業數據也藏在裡面，變成第二層摺疊
+            with st.expander("🛠️ 查看航太工程師 FMEA 原始數據 (Engineering Data)"):
+                st.table(pd.DataFrame(car_fmea[selected_model]).drop(columns=['check_guide']))
 
         if force_risk:
             st.caption(f"💡 系統已自動將上述風險成本加入試算：汽油版 +${fmea_cost_gas:,} / 油電版 +${fmea_cost_hybrid:,}")
