@@ -126,6 +126,17 @@ def page_toyota_tco():
     st.title(f"✈️ 航太工程師的 {selected_model} 購車精算機")
     st.caption("運用航太級 TCO 模型，幫您算出符合數學邏輯的最佳選擇。")
 
+    if selected_model in car_fmea:
+        with st.expander("🛠️ 內部檢視：航太級 FMEA 失效模式分析 (Engineering Only)", expanded=True):
+            st.markdown("針對此車型之 **RPN (風險優先數)** 鑑定如下：")
+            
+            for issue in car_fmea[selected_model]:
+                rpn = issue['s'] * issue['o'] * issue['d']
+                st.error(f"**項目：{issue['part']} ({issue['years']})**")
+                # 這裡就是顯示專業備註的地方
+                st.info(f"🧬 {issue['eng_note']}")
+                st.markdown(f"* **RPN 指數**: {rpn} (發生度 O: {issue['o']}/10) | **預估維修**: ${issue['cost']:,}")
+                st.divider()
     # --- 🔥 FMEA 通病雷達區塊 (新功能) ---
     fmea_cost_gas = 0
     fmea_cost_hybrid = 0
