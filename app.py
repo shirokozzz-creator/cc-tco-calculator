@@ -5,7 +5,7 @@ import plotly.express as px
 
 # 1. UI 與系統設定
 st.set_page_config(page_title="Naval Motors 資產防禦系統", layout="wide")
-st.title("Naval Motors 總體持有成本 (TCO) 決策系統 v0.2")
+st.title("Naval Motors 總體持有成本 (TCO) 決策系統 v0.3")
 
 # 2. 資料庫讀取引擎
 @st.cache_data
@@ -14,6 +14,10 @@ def get_model_data(model_name):
     query = f"SELECT 成交月份, 出廠年月, 車輛評價, 里程數, 得標價 FROM auctions_time_series WHERE 車系與車型 = '{model_name}'"
     df = pd.read_sql_query(query, conn)
     conn.close()
+    
+    # 處理年份：將 2021.05 轉換為整數 2021
+    if not df.empty:
+        df['出廠年份'] = df['出廠年月'].apply(lambda x: int(float(x)))
     return df
 
 # 3. 系統初始化與資料庫掃描
@@ -30,24 +34,32 @@ except Exception as e:
 # 4. 前端引流與參數輸入區 (側邊欄)
 st.sidebar.header("1. 輸入目標車輛現況")
 selected_model = st.sidebar.selectbox("評估車型", models, index=models.index('NX200') if 'NX200' in models else 0)
-target_mileage = st.sidebar.number_input("目標車輛里程數 (km)", min_value=0, value=85000, step=5000)
-dealer_price = st.sidebar.number_input("終端車商開價 (TWD)", min_value=100000, value=850000, step=10000)
-is_hybrid = st.sidebar.toggle("此車為 Hybrid 油電混合車型")
 
-st.sidebar.header("2. 財務工程參數")
-loan_rate = st.sidebar.slider("預計車貸利率 (%)", 2.0, 16.0, 6.0, 0.5)
+# 撈取該車型完整數據
+df_car_full = get_model_data(selected_model)
 
-# 5. 撈取數據與基礎運算
-df_car = get_model_data(selected_model)
+if not df_car_full.empty:
+    # 提取該車型可用的年份列表，並由大到小排序
+    available_years = sorted(df_car_full['出廠年份'].unique(), reverse=True)
+    selected_year = st.sidebar.selectbox("出廠年份", available_years)
+    
+    target_mileage = st.sidebar.number_input("目標車輛里程數 (km)", min_value=0, value=85000, step=5000)
+    dealer_price = st.sidebar.number_input("終端車商開價 (TWD)", min_value=100000, value=850000, step=10000)
+    is_hybrid = st.sidebar.toggle("此車為 Hybrid 油電混合車型")
 
-if not df_car.empty:
+    st.sidebar.header("2. 財務工程參數")
+    loan_rate = st.sidebar.slider("預計車貸利率 (%)", 2.0, 16.0, 6.0, 0.5)
+
+    # 5. 精準過濾：只取「指定車型 + 指定年份」的數據來算錢
+    df_target_year = df_car_full[df_car_full['出廠年份'] == selected_year]
+
     # 商業邏輯 A：計算合理零售樓地板
-    median_auction = df_car['得標價'].median()
+    median_auction = df_target_year['得標價'].median()
     retail_floor = median_auction * 1.10  # 加上 10% 合理管銷利潤
     
-    st.subheader(f"🛡️ 模組一：定價黑箱解密 ({selected_model})")
+    st.subheader(f"🛡️ 模組一：定價黑箱解密 ({selected_year}年 {selected_model})")
     col1, col2, col3 = st.columns(3)
-    col1.metric("系統批發底價中位數", f"${median_auction:,.0f}")
+    col1.metric("同年份批發底價中位數", f"${median_auction:,.0f}")
     col2.metric("合理零售樓地板價 (+10%)", f"${retail_floor:,.0f}")
     
     # 釣魚價防呆判定
@@ -78,20 +90,19 @@ if not df_car.empty:
     
     # 商業邏輯 C：機會成本暴擊
     st.subheader("📉 模組三：貸款機會成本 (The Opportunity Cost)")
-    # 簡化版 ETF 機會成本計算 (年化 7%，單利估算對比)
     etf_return = dealer_price * ((1 + 0.07)**3 - 1)
     
     st.warning(f"""
     如果您選擇全額現金或高利貸款購買此車，相較於將同等資金 ({dealer_price:,.0f} TWD) 投入年化報酬率 7% 的大盤 ETF (如 0050 或 VTI)：
     **三年後，您將產生高達 $ {etf_return:,.0f} TWD 的財富差距損失。**
-    這才是這台車真正的隱藏持有成本。
     """)
     
-    # 視覺化：模糊化歷史散佈圖
+    # 視覺化：模糊化歷史散佈圖 (展示同年份的里程折舊)
     st.markdown("---")
-    st.subheader("📊 模組四：歷史拍賣散佈圖 (數據模糊化處理)")
-    df_car['價格(萬)'] = df_car['得標價'] / 10000
-    fig = px.scatter(df_car, x="里程數", y="價格(萬)", color="車輛評價", title="里程 vs 拍賣底價 (模糊化)")
+    st.subheader(f"📊 模組四：{selected_year}年 {selected_model} 市場散佈圖 (模糊化)")
+    df_target_year_plot = df_target_year.copy()
+    df_target_year_plot['價格(萬)'] = df_target_year_plot['得標價'] / 10000
+    fig = px.scatter(df_target_year_plot, x="里程數", y="價格(萬)", color="車輛評價", title=f"{selected_year}年 里程 vs 拍賣底價")
     st.plotly_chart(fig, use_container_width=True)
 
 else:
