@@ -19,7 +19,7 @@ st.markdown("""
     .metric-title { font-size: 16px; color: #64748B; font-weight: 600; margin-bottom: 5px;}
     .metric-value { font-size: 28px; color: #0F172A; font-weight: 900;}
     </style>
-    <div class='main-title'>Naval Motors | 深度資產量化報告 v1.0</div>
+    <div class='main-title'>Naval Motors | 深度資產量化報告 v1.1</div>
     <div class='sub-title'>專業版功能：價格合規防線 ｜ 三年 TCO 與殘值終局預測 ｜ 大數據折舊曲線</div>
     """, unsafe_allow_html=True)
 
@@ -85,9 +85,8 @@ if not df_car.empty:
         tax_3yr = 52320 # 假設 1.8~2.0L 稅金 (三年)
         total_3yr_expense = tco_maintenance + battery_fund + tax_3yr
         
-        # 三年後殘值預估 (以當前盤價為基底，預估再折舊 30% 加上里程自然耗損)
-        expected_future_mileage = target_mileage + 45000 # 假設三年開 4.5 萬公里
-        residual_value = median_auction * 0.7 # 基準七折
+        # 三年後殘值預估 (以當前盤價為基底，預估再折舊 30%)
+        residual_value = median_auction * 0.7 
         
         # 真實總成本 = 買車錢 + 三年養車錢 - 三年後賣掉的錢
         true_cost = dealer_price + total_3yr_expense - residual_value
@@ -138,34 +137,33 @@ if not df_car.empty:
                 st.success("✅ **價格合規**：開價高於底價門檻，屬於正常市場營運區間，可進入下一步 TCO 財務精算。")
 
         # ==========================================
-        # Tab 2：三年 TCO 與殘值預測 (全新簡單版瀑布圖)
+        # Tab 2：三年 TCO 與殘值預測 (已修復繪圖報錯)
         # ==========================================
         with tab2:
             st.markdown("### 🔮 持有三年之總體現金流預測 (The Real Cost)")
             
-            # 上方顯示三個簡單的數字總結
             col1, col2, col3 = st.columns(3)
             with col1:
                 st.markdown(f"<div class='metric-card'><div class='metric-title'>預計三年維修保養與稅金</div><div class='metric-value'>${total_3yr_expense:,.0f}</div></div>", unsafe_allow_html=True)
             with col2:
-                st.markdown(f"<div class='metric-card' style='border-color:#10B981;'><div class='metric-title'>預計三年後可賣出殘值 (資金回籠)</div><div class='metric-value' style='color:#10B981;'>${residual_value:,.0f}</div></div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='metric-card' style='border-color:#10B981;'><div class='metric-title'>預計三年後可賣出殘值 (收回)</div><div class='metric-value' style='color:#10B981;'>${residual_value:,.0f}</div></div>", unsafe_allow_html=True)
             with col3:
-                st.markdown(f"<div class='metric-card' style='border-color:#EF4444;'><div class='metric-title'>三年真實持有淨成本 (總折舊+花費)</div><div class='metric-value' style='color:#EF4444;'>${true_cost:,.0f}</div></div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='metric-card' style='border-color:#EF4444;'><div class='metric-title'>三年真實持有淨成本 (總花費)</div><div class='metric-value' style='color:#EF4444;'>${true_cost:,.0f}</div></div>", unsafe_allow_html=True)
             
-            # 極度簡化的瀑布圖
             fig_waterfall = go.Figure(go.Waterfall(
                 name="現金流", orientation="v",
                 measure=["relative", "relative", "relative", "total"],
-                x=["1. 買車當下支出 (開價)", "2. 三年預計花費 (稅金/保養/耗材)", "3. 三年後賣出殘值 (資金收回)", "4. 實際持有總成本 (淨流出)"],
+                x=["1. 買車當下支出 (開價)", "2. 三年預計花費 (稅金/耗材)", "3. 三年後賣出殘值 (資金回籠)", "4. 實際持有總成本 (淨流出)"],
                 textposition="outside",
                 text=[f"${dealer_price/10000:.1f}萬", f"+${total_3yr_expense/10000:.1f}萬", f"-${residual_value/10000:.1f}萬", f"${true_cost/10000:.1f}萬"],
                 y=[dealer_price, total_3yr_expense, -residual_value, true_cost],
                 connector={"line":{"color":"#94A3B8", "width":2, "dash":"dot"}},
                 decreasing={"marker":{"color":"#10B981"}}, increasing={"marker":{"color":"#EF4444"}}, totals={"marker":{"color":"#0F172A"}}
             ))
+            # 這裡的 tickfont 已移除 fontweight='bold' 避免報錯
             fig_waterfall.update_layout(
                 yaxis=dict(gridcolor="#E2E8F0"),
-                xaxis=dict(tickfont=dict(size=14, fontweight='bold')),
+                xaxis=dict(tickfont=dict(size=14)),
                 plot_bgcolor='rgba(0,0,0,0)', height=550, margin=dict(t=50)
             )
             st.plotly_chart(fig_waterfall, use_container_width=True)
@@ -190,7 +188,9 @@ if not df_car.empty:
             )
             st.plotly_chart(fig_scatter, use_container_width=True)
 
+        # ==========================================
         # 底部實戰腳本輸出
+        # ==========================================
         st.markdown("---")
         st.subheader("💡 談判賽局：高期望值殺價腳本")
         script = f"「老闆，我調過全台大數據盤價，這年份底價中位數在 {median_auction/10000:.1f} 萬。雖然我知道這台車有 {dealer_margin/10000:.1f} 萬的毛利空間，但因為這台車後續我得立刻提列 {total_3yr_expense/10000:.1f} 萬作為三年耗材與稅金預算。如果能以 {retail_floor/10000:.1f} 萬現金成交，我們今天就簽約，你們也不用承擔融資利息成本。」"
