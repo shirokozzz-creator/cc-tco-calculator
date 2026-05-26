@@ -3,24 +3,23 @@ import sqlite3
 import pandas as pd
 import numpy as np
 import plotly.express as px
+import plotly.graph_objects as go
 
 # ==========================================
-# 1. UI 與 Naval Motors 視覺規範
+# 1. UI 視覺與 Premium 品牌設定
 # ==========================================
-st.set_page_config(page_title="Naval Motors 鑑定防禦系統", layout="wide")
+st.set_page_config(page_title="Naval Motors 企業級資產防禦系統", layout="wide", initial_sidebar_state="expanded")
 st.markdown("""
     <style>
-    .main-title { font-size: 36px; font-weight: 900; color: #1E3A8A; }
-    .sub-title { font-size: 16px; color: #64748B; margin-bottom: 20px; }
-    .metric-box { padding: 10px; border-radius: 5px; background-color: #F1F5F9; border-left: 4px solid #3B82F6; margin-bottom: 10px;}
+    .main-title { font-size: 38px; font-weight: 900; color: #0F172A; letter-spacing: -1px; }
+    .sub-title { font-size: 16px; color: #475569; margin-bottom: 25px; border-bottom: 2px solid #E2E8F0; padding-bottom: 10px;}
+    .premium-box { background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); color: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+    .margin-text { font-size: 24px; font-weight: bold; color: #10B981; }
     </style>
-    <div class='main-title'>Naval Motors 資產量化防禦系統 v0.7</div>
-    <div class='sub-title'>動態資料衍生物引擎啟動 ｜ 流動性與物理折現率精算 TWD</div>
+    <div class='main-title'>Naval Motors | 深度資產量化報告 v0.8</div>
+    <div class='sub-title'>專業版功能：六維雷達分析 ｜ TCO 瀑布模型 ｜ 賽局底牌透視</div>
     """, unsafe_allow_html=True)
 
-# ==========================================
-# 2. 資料萃取與清洗引擎
-# ==========================================
 def extract_color(raw_text):
     colors = ['白', '黑', '銀', '灰', '淺棕', '紅', '藍', '深灰', '鐵灰', '深綠']
     for c in colors:
@@ -39,106 +38,111 @@ def get_model_data(model_name):
     return df
 
 # ==========================================
-# 3. 側邊欄：雙階段防呆 SOP 參數輸入
+# 2. 側邊欄：實體特徵輸入
 # ==========================================
 try:
     models = pd.read_sql("SELECT DISTINCT 車系與車型 FROM auctions_time_series", sqlite3.connect("cars_time_series.db"))['車系與車型'].tolist()
 except: models = []
 
-st.sidebar.markdown("### 🛠️ 核心變數提取 (SOP)")
-selected_model = st.sidebar.selectbox("車系與車型 (Model)", models, index=models.index('NX200') if 'NX200' in models else 0)
-df_car = get_model_data(selected_model)
-
-if not df_car.empty:
-    selected_year = st.sidebar.selectbox("出廠年份 (Year)", sorted(df_car['出廠年份'].unique(), reverse=True))
-    target_mileage = st.sidebar.number_input("里程數 (Mileage) km", value=75000, step=5000)
-    vehicle_grade = st.sidebar.selectbox("鑑定評價 (Grade)", ["A / A+", "B / B+", "未記載"])
+with st.sidebar:
+    st.markdown("### 🔍 設定目標標的物")
+    selected_model = st.selectbox("車系與車型", models, index=models.index('NX200') if 'NX200' in models else 0)
+    df_car = get_model_data(selected_model)
     
-    st.sidebar.markdown("### 💰 交易條件")
-    dealer_price = st.sidebar.number_input("終端零售開價 (TWD)", value=800000, step=10000)
-    is_hybrid = st.sidebar.toggle("Hybrid 系統 (計算大電池 TCO)")
+    if not df_car.empty:
+        selected_year = st.selectbox("出廠年份", sorted(df_car['出廠年份'].unique(), reverse=True))
+        selected_color = st.selectbox("車輛顏色", sorted(df_car['車色'].unique()))
+        
+        st.markdown("### 💰 交易條件與鑑定")
+        target_mileage = st.number_input("車商標示里程 (km)", value=75000, step=5000)
+        dealer_price = st.number_input("車商開價 (TWD)", value=800000, step=10000)
+        vehicle_grade = st.selectbox("買家自帶鑑定評級", ["A / A+ (無事故)", "B / B+ (有瑕疵)", "未記載 (車行自保)"])
+        is_hybrid = st.toggle("Hybrid 油電系統")
 
-    # 基礎篩選 (同年份)
+# ==========================================
+# 3. 核心運算與報告渲染
+# ==========================================
+if not df_car.empty:
     df_yr = df_car[df_car['出廠年份'] == selected_year]
     
-    # ==========================================
-    # 4. 衍生數據運算 (量化金融模組)
-    # ==========================================
     if not df_yr.empty:
-        # A. 流動性運算
-        trade_count = len(df_yr)
-        liquidity_status = "極佳 (易脫手)" if trade_count > 30 else ("普通" if trade_count > 10 else "極差 (流動性陷阱)")
+        # --- 數據精算 ---
+        median_auction = df_yr['得標價'].median()
+        retail_floor = median_auction * 1.08
+        dealer_margin = dealer_price - median_auction # 推算毛利
         
-        # B. 降級懲罰金運算 (A級 vs B級 價差)
-        grade_a_median = df_yr[df_yr['車輛評價'].str.contains('A', na=False)]['得標價'].median()
-        grade_b_median = df_yr[df_yr['車輛評價'].str.contains('B', na=False)]['得標價'].median()
-        penalty = 0
-        if pd.notna(grade_a_median) and pd.notna(grade_b_median):
-            penalty = grade_a_median - grade_b_median
-            
-        # C. 里程折現率 (線性迴歸)
-        mileage_slope = 0
-        if trade_count > 5:
-            # 排除極端值後計算斜率
-            q1 = df_yr['得標價'].quantile(0.1)
-            q9 = df_yr['得標價'].quantile(0.9)
-            valid_df = df_yr[(df_yr['得標價'] >= q1) & (df_yr['得標價'] <= q9)]
-            if len(valid_df) > 5:
-                slope, _ = np.polyfit(valid_df['里程數'], valid_df['得標價'], 1)
-                mileage_slope = slope * 10000 # 每萬公里折價
+        # 里程折現率
+        q1, q9 = df_yr['得標價'].quantile(0.1), df_yr['得標價'].quantile(0.9)
+        valid_df = df_yr[(df_yr['得標價'] >= q1) & (df_yr['得標價'] <= q9)]
+        mileage_slope = np.polyfit(valid_df['里程數'], valid_df['得標價'], 1)[0] * 10000 if len(valid_df) > 5 else 0
         
-        retail_floor = df_yr['得標價'].median() * 1.08
-        
-        # ==========================================
-        # 5. 報告渲染
-        # ==========================================
-        st.markdown("---")
-        
-        # 模組一：市場宏觀與流動性
-        st.subheader(f"📊 模組一：資產流動性與物理折現率 ({selected_year}年 {selected_model})")
-        c1, c2, c3 = st.columns(3)
-        c1.metric("樣本數據量 (17個月)", f"{trade_count} 台", liquidity_status, delta_color="off")
-        
-        if mileage_slope < 0:
-            c2.metric("每萬公里殘值折損", f"{mileage_slope:,.0f} TWD", "線性衰變參數", delta_color="inverse")
-        else:
-            c2.metric("每萬公里殘值折損", "樣本過少無法精算", "需人工輔助判定", delta_color="off")
-            
-        if penalty > 0:
-            c3.metric("B級瑕疵降級懲罰金", f"-{penalty:,.0f} TWD", "A級與B級中位數落差", delta_color="inverse")
-        else:
-            c3.metric("B級瑕疵降級懲罰金", "無顯著價差", "樣本分佈過於集中", delta_color="off")
-
-        # 模組二：定價與評價風險
-        st.subheader("⚠️ 模組二：定價釣魚與車況黑箱偵測")
-        p1, p2 = st.columns(2)
-        with p1:
-            st.markdown(f"<div class='metric-box'><b>防禦基準線：</b> 合理零售門檻為 {retail_floor:,.0f} TWD</div>", unsafe_allow_html=True)
-            if dealer_price < retail_floor:
-                st.error("🚨 釣魚/重大事故警報：開價異常低於批發水位。期望值為負，請立即中止交易。")
-            else:
-                st.success(f"✅ 開價溢價約 {dealer_price - retail_floor:,.0f} TWD，屬正常商業套利區間。")
-                
-        with p2:
-            st.markdown(f"<div class='metric-box'><b>當前輸入評價：</b> {vehicle_grade}</div>", unsafe_allow_html=True)
-            if vehicle_grade == "未記載":
-                st.error(f"☠️ 結構黑箱風險：未確認評價。根據大數據，若此車實為B級，您將承擔約 {penalty:,.0f} TWD 的未實現資產減損。")
-            elif vehicle_grade == "B / B+":
-                st.warning("⚠️ 瑕疵折現：此車帶有修復歷或瑕疵。請確認車商是否已將降級懲罰金反映於售價上。")
-            else:
-                st.success("✅ 結構健全：A級評價確保殘值穩固，免於降級懲罰。")
-
-        # 模組三：TCO 與談判
-        st.subheader("🛠️ 模組三：TCO 總體持有成本與談判籌碼")
-        tco_base = 42000 
+        # TCO 計算
+        tco_base = 42000
         battery_fund = 55000 if (is_hybrid and target_mileage > 100000) else 0
-        total_tco = tco_base + battery_fund
+        tax_3yr = 52320 # 假設 1.8-2.0 級距三年稅金
+        residual_value = median_auction * 0.7 # 粗估三年後殘值 (七折)
+        true_cost = dealer_price + tco_base + battery_fund + tax_3yr - residual_value
+
+        # --- 評分系統 (0-100) ---
+        score_price = max(0, min(100, 100 - ((dealer_price - retail_floor) / retail_floor) * 200)) if dealer_price >= retail_floor else 10 # 釣魚價給極低分
+        score_liquidity = min(100, len(df_yr) * 5)
+        score_condition = 95 if "A" in vehicle_grade else (50 if "B" in vehicle_grade else 20)
+        score_mileage = max(0, min(100, 100 - (target_mileage - 60000)/1500))
+        score_tco = max(0, min(100, 100 - (battery_fund/1000)))
         
-        st.info(f"👉 **未來三年物理耗損準備金 (TCO)： {total_tco:,.0f} TWD**")
-        if battery_fund > 0: st.warning(f"包含大電池與冷卻系統高頻失效準備金 {battery_fund:,.0f} TWD。")
-        
-        script = f"「老闆，這台 {selected_model} 大數據盤價約 {df_yr['得標價'].median()/10000:.1f} 萬。里程 {target_mileage/10000:.1f} 萬，每多一萬公里殘值會掉 {-mileage_slope/10000:.1f} 萬。加上未來三年我要準備 {total_tco/10000:.1f} 萬保養，如果能以 {retail_floor/10000:.1f} 萬現金成交，我們馬上處理。」"
-        st.markdown(f"**高期望值談判腳本：**\n> {script}")
+        # ==========================================
+        # 報告板塊 A：高管視角 (Executive Summary)
+        # ==========================================
+        st.markdown(f"""
+        <div class='premium-box'>
+            <h3 style='margin-top:0px;'>賽局底牌透視：車商潛在毛利分析</h3>
+            <p>根據 17 個月大數據，此車型同年份之行內批發盤價中位數為 <b>{median_auction:,.0f} TWD</b>。</p>
+            <p>推算該車商開價中，包含了 <span class='margin-text'>{dealer_margin:,.0f} TWD</span> 的毛利空間 (含整備與利潤)。</p>
+            <p style='font-size: 14px; color: #94A3B8;'>策略建議：以此水位向下遞減 {dealer_margin * 0.4:,.0f} 至 {dealer_margin * 0.7:,.0f} 進行首輪議價，確保期望值最大化。</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        tab1, tab2, tab3 = st.tabs(["📊 六維防禦雷達", "💸 TCO 瀑布模型", "📈 里程折舊曲線"])
+
+        # ==========================================
+        # 報告板塊 B：雷達圖 (Radar Chart)
+        # ==========================================
+        with tab1:
+            fig_radar = go.Figure(data=go.Scatterpolar(
+              r=[score_price, score_liquidity, score_condition, score_mileage, score_tco, score_price],
+              theta=['價格合理度', '市場流動性', '鑑定健康度', '里程低衰變', 'TCO 維修負荷', '價格合理度'],
+              fill='toself', line_color='#3B82F6', fillcolor='rgba(59, 130, 246, 0.4)'
+            ))
+            fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), title="Naval 標的物綜合防禦評級", height=450)
+            st.plotly_chart(fig_radar, use_container_width=True)
+
+        # ==========================================
+        # 報告板塊 C：TCO 瀑布圖 (Waterfall Chart)
+        # ==========================================
+        with tab2:
+            fig_waterfall = go.Figure(go.Waterfall(
+                name="TCO", orientation="v",
+                measure=["relative", "relative", "relative", "relative", "relative", "total"],
+                x=["車商開價", "三年常規保養", "大電池預備金", "三年稅金", "三年後預估殘值", "最終淨流出 (真 TCO)"],
+                textposition="outside",
+                text=[f"{dealer_price/10000:.1f}萬", f"{tco_base/10000:.1f}萬", f"{battery_fund/10000:.1f}萬", f"{tax_3yr/10000:.1f}萬", f"-{residual_value/10000:.1f}萬", f"{true_cost/10000:.1f}萬"],
+                y=[dealer_price, tco_base, battery_fund, tax_3yr, -residual_value, true_cost],
+                connector={"line":{"color":"rgb(63, 63, 63)"}},
+                decreasing={"marker":{"color":"#10B981"}}, increasing={"marker":{"color":"#EF4444"}}, totals={"marker":{"color":"#1E3A8A"}}
+            ))
+            fig_waterfall.update_layout(title="未來三年現金流淨現值 (NPV) 推演", height=450)
+            st.plotly_chart(fig_waterfall, use_container_width=True)
+
+        # ==========================================
+        # 報告板塊 D：散佈圖與折現率
+        # ==========================================
+        with tab3:
+            df_yr['價格(萬)'] = df_yr['得標價'] / 10000
+            color_map = {'白': '#F8FAFC', '黑': '#0F172A', '銀': '#94A3B8', '灰': '#475569', '淺棕': '#D6D3D1', '紅': '#EF4444', '藍': '#3B82F6', '其他': '#10B981'}
+            fig_scatter = px.scatter(df_yr, x="里程數", y="價格(萬)", color="車色", color_discrete_map=color_map, 
+                                     title=f"物理折現率精算：每萬公里殘值減損 {-mileage_slope:,.0f} TWD")
+            fig_scatter.update_layout(plot_bgcolor='#E2E8F0', paper_bgcolor='rgba(0,0,0,0)', height=450)
+            st.plotly_chart(fig_scatter, use_container_width=True)
 
     else:
-        st.warning("該條件組合在資料庫中無足夠樣本。")
+        st.warning("資料庫樣本不足，無法生成高級圖表。")
